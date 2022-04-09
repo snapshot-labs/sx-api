@@ -1,4 +1,4 @@
-import { toQuery, toSql, toGql } from '../../../../src/checkpoint/graphql/utils';
+import { toQueryResolver, toSql, toGql } from '../../../../src/checkpoint/graphql/utils';
 
 describe('toSql', () => {
   it('should work', () => {
@@ -13,7 +13,7 @@ type Vote {
   });
 });
 
-describe('toQuery', () => {
+describe('toQueryResolver', () => {
   it('should work', () => {
     const typedef = `
 type Vote {
@@ -21,7 +21,7 @@ type Vote {
   name: String
 }
     `;
-    const query = toQuery(typedef);
+    const query = toQueryResolver(typedef);
     expect(query).toMatchSnapshot();
   });
 });

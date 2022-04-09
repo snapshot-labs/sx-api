@@ -28,7 +28,7 @@ type Vote {
     "
 `;
 
-exports[`toQuery should work 1`] = `
+exports[`toQueryResolver should work 1`] = `
 Object {
   "vote": [Function],
   "votes": [Function],

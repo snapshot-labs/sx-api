@@ -1,5 +1,10 @@
-import { introspectionFromSchema } from 'graphql';
+import {
+  introspectionFromSchema,
+  IntrospectionNamedTypeRef,
+  IntrospectionObjectType
+} from 'graphql';
 import { makeExecutableSchema } from '@graphql-tools/schema';
+import { IResolvers } from '@graphql-tools/utils';
 import mysql from '../mysql';
 
 async function queryMulti(parent, args, context, info) {
@@ -27,6 +32,28 @@ async function querySingle(parent, args, context, info) {
   const [item] = await mysql.queryAsync(query, [args.id]);
   return item;
 }
+
+/**
+ * Returns a list of objects defined within the graphql typedefs.
+ * The types returns are introspection objects, that can be used
+ * for inspecting the fields and types.
+ *
+ * Note, that the returned objects does not include the Query object type if defined.
+ *
+ */
+const getObjectsSchemas = (typeDefs: string): IntrospectionObjectType[] => {
+  const schema = makeExecutableSchema({ typeDefs: `type Query { x: String }\n${typeDefs}` });
+  return introspectionFromSchema(schema)
+    .__schema.types.filter(type => {
+      return (
+        type.kind === 'OBJECT' &&
+        type.fields &&
+        !type.name.startsWith('__') &&
+        type.name !== 'Query'
+      );
+    })
+    .map(type => type as IntrospectionObjectType);
+};
 
 /**
  * toSql generates SQL statements to create tables based on the types defined
@@ -60,37 +87,65 @@ async function querySingle(parent, args, context, info) {
  *
  */
 export function toSql(typeDefs: string): string {
-  const schema = makeExecutableSchema({
-    typeDefs: `type Query { x: String }\n${typeDefs}`
-  });
   let sql = 'DROP TABLE IF EXISTS checkpoint;';
   sql += '\nCREATE TABLE checkpoint (number BIGINT NOT NULL, PRIMARY KEY (number));';
   sql += '\nINSERT checkpoint SET number = 0;';
-  introspectionFromSchema(schema).__schema.types.forEach(type => {
-    const clone = JSON.parse(JSON.stringify(type));
-    if (
-      clone.kind === 'OBJECT' &&
-      clone.fields &&
-      !clone.name.startsWith('__') &&
-      clone.name !== 'Query'
-    ) {
-      sql += `\n\nDROP TABLE IF EXISTS ${clone.name.toLowerCase()}s;`;
-      sql += `\nCREATE TABLE ${clone.name.toLowerCase()}s (`;
-      let sqlIndexes = ``;
-      clone.fields.forEach(field => {
-        const fieldType = field.type.name;
-        let sqlType = 'VARCHAR(128)';
-        if (fieldType === 'Int') sqlType = 'INT(128)';
-        if (fieldType === 'String') sqlType = 'VARCHAR(128)';
-        if (fieldType === 'Text') sqlType = 'TEXT';
-        sql += `\n  ${field.name} ${sqlType} NOT NULL,`;
-        if (fieldType !== 'Text') sqlIndexes += `,\n  INDEX ${field.name} (${field.name})`;
-      });
-      sql += `\n  PRIMARY KEY (id) ${sqlIndexes}\n);`;
-    }
+
+  getObjectsSchemas(typeDefs).forEach(type => {
+    sql += `\n\nDROP TABLE IF EXISTS ${type.name.toLowerCase()}s;`;
+    sql += `\nCREATE TABLE ${type.name.toLowerCase()}s (`;
+    let sqlIndexes = ``;
+    type.fields.forEach(field => {
+      const fieldType = (field.type as IntrospectionNamedTypeRef).name;
+      let sqlType = 'VARCHAR(128)';
+      if (fieldType === 'Int') sqlType = 'INT(128)';
+      if (fieldType === 'String') sqlType = 'VARCHAR(128)';
+      if (fieldType === 'Text') sqlType = 'TEXT';
+      sql += `\n  ${field.name} ${sqlType} NOT NULL,`;
+      if (fieldType !== 'Text') sqlIndexes += `,\n  INDEX ${field.name} (${field.name})`;
+    });
+    sql += `\n  PRIMARY KEY (id) ${sqlIndexes}\n);`;
   });
   return sql;
 }
+
+const generateGqlQueries = (types: IntrospectionObjectType[]): string => {
+  let gql = 'type Query {';
+  types.forEach(type => {
+    gql += `\n  ${type.name.toLowerCase()}s(`;
+    gql += `\n    first: Int`;
+    gql += `\n    skip: Int`;
+    gql += `\n    orderBy: String`;
+    gql += `\n    orderDirection: String`;
+    gql += `\n    where: Where${type.name}`;
+    gql += `\n  ): [${type.name}]`;
+    gql += `\n  ${type.name.toLowerCase()}(id: String): ${type.name}`;
+  });
+  gql += `\n}`;
+  return gql;
+};
+
+const generateGqlQueryInputs = (types: IntrospectionObjectType[]): string => {
+  let where = '';
+  types.forEach(type => {
+    where += `\n\ninput Where${type.name} {`;
+    type.fields.forEach(field => {
+      const fieldType = (field.type as IntrospectionNamedTypeRef).name;
+      if (fieldType !== 'Text') {
+        where += `\n  ${field.name}: ${fieldType}`;
+        where += `\n  ${field.name}_in: [${fieldType}]`;
+        if (fieldType === 'Int') {
+          where += `\n  ${field.name}_gt: ${fieldType}`;
+          where += `\n  ${field.name}_gte: ${fieldType}`;
+          where += `\n  ${field.name}_lt: ${fieldType}`;
+          where += `\n  ${field.name}_lte: ${fieldType}`;
+        }
+      }
+    });
+    where += `\n}`;
+  });
+  return where;
+};
 
 /**
  * toGql returns a graphql schema string with generated queries for fetching
@@ -129,46 +184,11 @@ export function toSql(typeDefs: string): string {
  *
  */
 export function toGql(typeDefs: string): string {
-  let where = '';
-  let gql = 'type Query {';
-  const schema = makeExecutableSchema({
-    typeDefs: `type Query { x: String }\n${typeDefs}`
-  });
-  introspectionFromSchema(schema).__schema.types.forEach(type => {
-    const clone = JSON.parse(JSON.stringify(type));
-    if (
-      clone.kind === 'OBJECT' &&
-      clone.fields &&
-      !clone.name.startsWith('__') &&
-      clone.name !== 'Query'
-    ) {
-      where += `\n\ninput Where${clone.name} {`;
-      gql += `\n  ${clone.name.toLowerCase()}s(`;
-      gql += `\n    first: Int`;
-      gql += `\n    skip: Int`;
-      gql += `\n    orderBy: String`;
-      gql += `\n    orderDirection: String`;
-      gql += `\n    where: Where${clone.name}`;
-      gql += `\n  ): [${clone.name}]`;
-      gql += `\n  ${clone.name.toLowerCase()}(id: String): ${clone.name}`;
-      clone.fields.forEach(field => {
-        const fieldType = field.type.name;
-        if (fieldType !== 'Text') {
-          where += `\n  ${field.name}: ${fieldType}`;
-          where += `\n  ${field.name}_in: [${fieldType}]`;
-          if (fieldType === 'Int') {
-            where += `\n  ${field.name}_gt: ${fieldType}`;
-            where += `\n  ${field.name}_gte: ${fieldType}`;
-            where += `\n  ${field.name}_lt: ${fieldType}`;
-            where += `\n  ${field.name}_lte: ${fieldType}`;
-          }
-        }
-      });
-      where += `\n}`;
-    }
-  });
-  gql += `\n}\n${where}\n\n${typeDefs}`;
-  return gql;
+  const objectTypes = getObjectsSchemas(typeDefs);
+  const gqlQuery = generateGqlQueries(objectTypes);
+  const gqlQueryInputs = generateGqlQueryInputs(objectTypes);
+
+  return `${gqlQuery}\n${gqlQueryInputs}\n\n${typeDefs}`;
 }
 
 /**
@@ -193,22 +213,11 @@ export function toGql(typeDefs: string): string {
  *
  * Note that a plural resolver is also created for each field
  */
-export function toQuery(typeDefs: string): Record<string, any> {
+export function toQueryResolver(typeDefs: string): IResolvers {
   const query = {};
-  const schema = makeExecutableSchema({
-    typeDefs: `type Query { x: String }\n${typeDefs}`
-  });
-  introspectionFromSchema(schema).__schema.types.forEach(type => {
-    const clone = JSON.parse(JSON.stringify(type));
-    if (
-      clone.kind === 'OBJECT' &&
-      clone.fields &&
-      !clone.name.startsWith('__') &&
-      clone.name !== 'Query'
-    ) {
-      query[`${clone.name.toLowerCase()}s`] = queryMulti;
-      query[clone.name.toLowerCase()] = querySingle;
-    }
+  getObjectsSchemas(typeDefs).forEach(type => {
+    query[`${type.name.toLowerCase()}s`] = queryMulti;
+    query[type.name.toLowerCase()] = querySingle;
   });
   return query;
 }
