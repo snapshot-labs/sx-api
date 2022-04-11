@@ -14,14 +14,14 @@ export default class Checkpoint {
   public provider: Provider;
   public checkpoints: number[];
 
-  private readonly gqlTransformer: GqlEntityController;
+  private readonly entityController: GqlEntityController;
 
   constructor(config, writer, schema: string, checkpoints) {
     this.config = config;
     this.writer = writer;
     this.schema = schema;
-    this.gqlTransformer = new GqlEntityController(schema);
-    this.graphql = getGraphQL(this.gqlTransformer.createEntityQuerySchema());
+    this.entityController = new GqlEntityController(schema);
+    this.graphql = getGraphQL(this.entityController.createEntityQuerySchema());
     this.provider = new Provider({ network: this.config.network });
     this.checkpoints = checkpoints;
   }
@@ -95,6 +95,6 @@ export default class Checkpoint {
 
   async reset() {
     console.log('Reset');
-    await this.gqlTransformer.createEntityStore(mysql);
+    await this.entityController.createEntityStores(mysql);
   }
 }

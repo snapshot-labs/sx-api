@@ -4,6 +4,8 @@ import {
   GraphQLFieldConfig,
   GraphQLFieldConfigMap,
   GraphQLFieldResolver,
+  GraphQLFloat,
+  GraphQLID,
   GraphQLInputObjectType,
   GraphQLInputObjectTypeConfig,
   GraphQLInt,
@@ -67,7 +69,7 @@ export class GqlEntityController {
    *     orderDirection: String
    *     where: WhereVote
    *   ): [Vote]
-   *   vote(id: String): Vote
+   *   vote(id: Int!): Vote
    * }
    *
    *  input WhereVote {
@@ -126,7 +128,7 @@ export class GqlEntityController {
    * DROP TABLE IF EXISTS votes;
    * CREATE TABLE votes (
    *   id VARCHAR(128) NOT NULL,
-   *   name VARCHAR(128) NOT NULL,
+   *   name VARCHAR(128),
    *   PRIMARY KEY (id) ,
    *   INDEX id (id),
    *   INDEX name (name)
@@ -134,7 +136,7 @@ export class GqlEntityController {
    * ```
    *
    */
-  public async createEntityStore(mysql): Promise<void> {
+  public async createEntityStores(mysql): Promise<void> {
     let sql = 'DROP TABLE IF EXISTS checkpoint;';
     sql += '\nCREATE TABLE checkpoint (number BIGINT NOT NULL, PRIMARY KEY (number));';
     sql += '\nINSERT checkpoint SET number = 0;';
@@ -145,17 +147,23 @@ export class GqlEntityController {
       let sqlIndexes = ``;
 
       this.getTypeFields(type).forEach(field => {
-        const fieldType = (field.type as GraphQLObjectType).name;
-        let sqlType = 'VARCHAR(128)';
-        if (fieldType === 'Int') sqlType = 'INT(128)';
-        if (fieldType === 'String') sqlType = 'VARCHAR(128)';
-        if (fieldType === 'Text') sqlType = 'TEXT';
-        sql += `\n  ${field.name} ${sqlType} NOT NULL,`;
-        if (fieldType !== 'Text') sqlIndexes += `,\n  INDEX ${field.name} (${field.name})`;
+        const sqlType = this.getSqlType(field.type);
+
+        sql += `\n  ${field.name} ${sqlType}`;
+        if (field.type instanceof GraphQLNonNull) {
+          sql += ' NOT NULL,';
+        } else {
+          sql += ',';
+        }
+
+        if (sqlType !== 'TEXT') {
+          sqlIndexes += `,\n  INDEX ${field.name} (${field.name})`;
+        }
       });
       sql += `\n  PRIMARY KEY (id) ${sqlIndexes}\n);`;
     });
 
+    // TODO(perfectmak): wrap this in a transaction
     return mysql.queryAsync(sql);
   }
 
@@ -188,7 +196,7 @@ export class GqlEntityController {
     return {
       type,
       args: {
-        id: { type: this.getObjectId(type) }
+        id: { type: new GraphQLNonNull(this.getEntityIdType(type)) }
       },
       resolve: resolver
     };
@@ -204,17 +212,27 @@ export class GqlEntityController {
     };
 
     this.getTypeFields(type).forEach(field => {
-      const fieldType = this.getFieldType(field.type).name;
-      if (field.type === GraphQLInt) {
+      // all field types in a where input variable must be optional
+      // so we try to extract the non null type here.
+      const nonNullFieldType = this.getNonNullType(field.type);
+
+      // avoid setting up where filters for non scalar types
+      if (!(nonNullFieldType instanceof GraphQLScalarType)) {
+        return;
+      }
+
+      if (nonNullFieldType === GraphQLInt) {
         whereInputConfig.fields[`${field.name}_gt`] = { type: GraphQLInt };
         whereInputConfig.fields[`${field.name}_gte`] = { type: GraphQLInt };
         whereInputConfig.fields[`${field.name}_lt`] = { type: GraphQLInt };
         whereInputConfig.fields[`${field.name}_lte`] = { type: GraphQLInt };
       }
 
-      if (fieldType !== 'Text') {
-        whereInputConfig.fields[`${field.name}`] = { type: field.type };
-        whereInputConfig.fields[`${field.name}_in`] = { type: new GraphQLList(field.type) };
+      if ((nonNullFieldType as GraphQLScalarType).name !== 'Text') {
+        whereInputConfig.fields[`${field.name}`] = { type: nonNullFieldType };
+        whereInputConfig.fields[`${field.name}_in`] = {
+          type: new GraphQLList(nonNullFieldType)
+        };
       }
     });
 
@@ -239,7 +257,7 @@ export class GqlEntityController {
     };
   }
 
-  private getObjectId(type: GraphQLObjectType): GraphQLScalarType {
+  private getEntityIdType(type: GraphQLObjectType): GraphQLScalarType {
     const idField = type.getFields().id;
     if (!idField) {
       throw new Error(
@@ -247,23 +265,55 @@ export class GqlEntityController {
       );
     }
 
-    // verify only scalar types are used
-    if (!(idField.type instanceof GraphQLScalarType)) {
-      throw new Error(`'id' field for type ${type.name} is not a scalar type`);
+    if (!(idField.type instanceof GraphQLNonNull)) {
+      throw new Error(`'id' field for type ${type.name} must be non nullable.`);
     }
 
-    return idField.type;
+    const nonNullType = idField.type.ofType;
+
+    // verify only scalar types are used
+    if (!(nonNullType instanceof GraphQLScalarType)) {
+      throw new Error(`'id' field for type ${type.name} is not a scalar type.`);
+    }
+
+    return nonNullType;
+  }
+
+  private getNonNullType(type: GraphQLOutputType): GraphQLOutputType {
+    if (type instanceof GraphQLNonNull) {
+      return type.ofType;
+    }
+
+    return type;
   }
 
   /**
-   * Return the type as a string and if nullable or not.
+   * Return a mysql column type for the graphql type.
+   *
+   * It throws if the type is not a recognized scalar type.
    */
-  private getFieldType(type: GraphQLOutputType): { name: string; nullable: boolean } {
-    // TODO: handle list types
+  private getSqlType(type: GraphQLOutputType): string {
     if (type instanceof GraphQLNonNull) {
-      return { nullable: false, name: (type.ofType as GraphQLObjectType).name };
+      type = type.ofType;
     }
 
-    return { nullable: true, name: (type as GraphQLObjectType).name };
+    switch (type) {
+      case GraphQLInt:
+        return 'INT(128)';
+      case GraphQLFloat:
+        return 'FLOAT(23)';
+      case GraphQLString:
+      case GraphQLID:
+        return 'VARCHAR(128)';
+    }
+
+    // check for TEXT scalar type
+    if (type instanceof GraphQLScalarType && type.name === 'Text') {
+      return 'TEXT';
+    }
+
+    // TODO(perfectmak): Add support for List types
+
+    throw new Error(`sql type for ${type} not support`);
   }
 }
