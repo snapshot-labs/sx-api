@@ -11,7 +11,7 @@ export interface CheckpointOptions {
   // Set the log output levels for checkpoint. Defaults to Silent.
   // Note, this does not affect the log outputs in writers.
   logLevel?: LogLevel;
-  // optionally convert logs to pretty output.
+  // optionally format logs to pretty output.
   // will require installing pino-pretty. Not recommended for production.
   prettifyLogs?: boolean;
 }
@@ -20,7 +20,6 @@ export default class Checkpoint {
   public config;
   public writer;
   public schema: string;
-  public graphql;
   public provider: Provider;
   public checkpoints: number[];
 
@@ -32,7 +31,6 @@ export default class Checkpoint {
     this.writer = writer;
     this.schema = schema;
     this.entityController = new GqlEntityController(schema);
-    this.graphql = getGraphQL(this.entityController.createEntityQuerySchema());
     this.provider = new Provider({ network: this.config.network });
     this.checkpoints = checkpoints;
 
@@ -46,6 +44,17 @@ export default class Checkpoint {
             }
           }
         : {})
+    });
+  }
+
+  /**
+   * Returns an express handler that exposes a GraphQL API to query entities defined
+   * in the schema.
+   *
+   */
+  public get graphql() {
+    return getGraphQL(this.entityController.createEntityQuerySchema(), {
+      log: this.log.child({ component: 'resolver' })
     });
   }
 
