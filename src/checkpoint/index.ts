@@ -8,7 +8,7 @@ import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 
 export interface CheckpointOptions {
-  // Set the log output levels for checkpoint. Defaults to Silent.
+  // Set the log output levels for checkpoint. Defaults to Error.
   // Note, this does not affect the log outputs in writers.
   logLevel?: LogLevel;
   // optionally format logs to pretty output.
@@ -36,7 +36,7 @@ export default class Checkpoint {
 
     this.log = createLogger({
       base: { component: 'checkpoint' },
-      level: opts?.logLevel || LogLevel.Silent,
+      level: opts?.logLevel || LogLevel.Error,
       ...(opts?.prettifyLogs
         ? {
             transport: {
