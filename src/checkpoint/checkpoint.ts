@@ -103,6 +103,22 @@ export default class Checkpoint {
     await this.store.insertCheckpoints(checkpoints);
   }
 
+  /**
+   * Returns list of blocks starting fromBlock number that have been encountered
+   * to contain events defined in the config.
+   *
+   * By default returns a maximum of 15 blocks from block provided, but the size
+   * can be changed through the limit argument.
+   *
+   * This is useful for periodically backing up and exporting checkpoints for your
+   * contracts.
+   *
+   */
+  public async exportCheckpoints(fromBlock: number, limit?: number): Promise<number[]> {
+    const blocks = await this.store.getNextCheckpointBlocks(fromBlock, this.sourceContracts, limit);
+    return blocks;
+  }
+
   private async getStartBlockNum() {
     let start = 0;
     let lastBlock = await this.store.getMetadataNumber('last_indexed_block');
@@ -185,10 +201,12 @@ export default class Checkpoint {
     this.log.debug({ txIndex: tx.transaction_index }, 'handling transaction');
 
     for (const source of this.config.sources) {
+      let foundContractData = false;
       const contract = validateAndParseAddress(source.contract);
 
       if (contract === validateAndParseAddress(tx.contract_address)) {
         if (tx.type === 'DEPLOY' && source.deploy_fn) {
+          foundContractData = true;
           this.log.info(
             { contract: source.contract, txType: tx.type, handlerFn: source.deploy_fn },
             'found deployment transaction'
@@ -202,6 +220,7 @@ export default class Checkpoint {
         if (contract === validateAndParseAddress(event.from_address)) {
           for (const sourceEvent of source.events) {
             if (`0x${starknetKeccak(sourceEvent.name).toString('hex')}` === event.keys[0]) {
+              foundContractData = true;
               this.log.info(
                 { contract: source.contract, event: sourceEvent.name, handlerFn: sourceEvent.fn },
                 'found contract event'
@@ -211,6 +230,20 @@ export default class Checkpoint {
             }
           }
         }
+      }
+
+      if (foundContractData) {
+        // no need to await checkpoints inserts, so insert async and log if there is an error
+        this.store
+          .insertCheckpoints([
+            { blockNumber: block.block_number, contractAddress: source.contract }
+          ])
+          .catch(err => {
+            this.log.error(
+              { err, blockNumber: block.block_number, contract: source.contract },
+              'failed to insert checkpoint record'
+            );
+          });
       }
     }
 
