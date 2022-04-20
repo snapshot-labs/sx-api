@@ -24,7 +24,7 @@ export interface ContractSourceConfig {
   // contract address
   contract: string;
   // start block number
-  start?: number;
+  start: number;
   // callback function in writer to handle deployment
   deploy_fn: string;
   events: ContractEventConfig[];
@@ -32,6 +32,8 @@ export interface ContractSourceConfig {
 
 // Configuration used to initialize Checkpoint
 export interface CheckpointConfig {
-  network: string;
+  network: SupportedNetworkName | string;
   sources: ContractSourceConfig[];
 }
+
+export type SupportedNetworkName = 'mainnet-alpha' | 'goerli-alpha';

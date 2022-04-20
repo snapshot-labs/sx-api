@@ -1,8 +1,8 @@
-import { getContractFromCheckpointConfig } from '../../../../src/checkpoint/utils/checkpoint';
+import { getContractsFromConfig } from '../../../../src/checkpoint/utils/checkpoint';
 import { validCheckpointConfig } from '../../../fixtures/checkpointConfig.fixture';
 
-describe('getContractFromCheckpointConfig', () => {
+describe('getContractsFromConfig', () => {
   it('should work', () => {
-    expect(getContractFromCheckpointConfig(validCheckpointConfig)).toMatchSnapshot();
+    expect(getContractsFromConfig(validCheckpointConfig)).toMatchSnapshot();
   });
 });

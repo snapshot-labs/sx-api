@@ -6,12 +6,12 @@ import getGraphQL from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
-import { CheckpointConfig, CheckpointOptions } from './types';
-import { getContractFromCheckpointConfig } from './utils/checkpoint';
+import { CheckpointConfig, CheckpointOptions, SupportedNetworkName } from './types';
+import { getContractsFromConfig } from './utils/checkpoint';
 import { CheckpointRecord, CheckpointsStore } from './stores/checkpoints';
 
 export default class Checkpoint {
-  public config;
+  public config: CheckpointConfig;
   public writer;
   public schema: string;
   public provider: Provider;
@@ -30,8 +30,8 @@ export default class Checkpoint {
     this.writer = writer;
     this.schema = schema;
     this.entityController = new GqlEntityController(schema);
-    this.provider = new Provider({ network: this.config.network });
-    this.sourceContracts = getContractFromCheckpointConfig(config);
+    this.provider = new Provider({ network: this.config.network as SupportedNetworkName });
+    this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
 
     this.log = createLogger({
@@ -101,22 +101,6 @@ export default class Checkpoint {
     });
 
     await this.store.insertCheckpoints(checkpoints);
-  }
-
-  /**
-   * Returns list of blocks starting fromBlock number that have been encountered
-   * to contain events defined in the config.
-   *
-   * By default returns a maximum of 15 blocks from block provided, but the size
-   * can be changed through the limit argument.
-   *
-   * This is useful for periodically backing up and exporting checkpoints for your
-   * contracts.
-   *
-   */
-  public async exportCheckpoints(fromBlock: number, limit?: number): Promise<number[]> {
-    const blocks = await this.store.getNextCheckpointBlocks(fromBlock, this.sourceContracts, limit);
-    return blocks;
   }
 
   private async getStartBlockNum() {
@@ -190,7 +174,8 @@ export default class Checkpoint {
   private async handleBlock(block: GetBlockResponse) {
     this.log.info({ blockNumber: block.block_number }, 'handling block');
 
-    for (const receipt of Object.values(block.transaction_receipts)) {
+    // @ts-ignore
+    for (const receipt of block.transaction_receipts) {
       await this.handleTx(block, block.transactions[receipt.transaction_index], receipt);
     }
 
@@ -233,17 +218,9 @@ export default class Checkpoint {
       }
 
       if (foundContractData) {
-        // no need to await checkpoints inserts, so insert async and log if there is an error
-        this.store
-          .insertCheckpoints([
-            { blockNumber: block.block_number, contractAddress: source.contract }
-          ])
-          .catch(err => {
-            this.log.error(
-              { err, blockNumber: block.block_number, contract: source.contract },
-              'failed to insert checkpoint record'
-            );
-          });
+        await this.store.insertCheckpoints([
+          { blockNumber: block.block_number, contractAddress: source.contract }
+        ]);
       }
     }
 
