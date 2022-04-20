@@ -8,6 +8,7 @@ import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { CheckpointConfig, CheckpointOptions } from './types';
 import { getContractFromCheckpointConfig } from './utils/checkpoint';
+import { CheckpointsStore } from './stores/checkpoints';
 
 export default class Checkpoint {
   public config;
@@ -21,6 +22,7 @@ export default class Checkpoint {
 
   private mysqlPool?: AsyncMySqlPool;
   private mysqlConnection?: string;
+  private checkpointsStore?: CheckpointsStore;
 
   constructor(config: CheckpointConfig, writer, schema: string, opts?: CheckpointOptions) {
     this.config = config;
@@ -59,19 +61,29 @@ export default class Checkpoint {
 
   public async start() {
     this.log.debug('starting');
+
+    await this.store.createStore();
+
     const blockNum = await this.getStartBlockNum();
     return await this.next(blockNum);
   }
 
   public async reset() {
     this.log.debug('reset');
+
+    await this.store.deleteStore();
+    await this.store.createStore();
+
     await this.entityController.createEntityStores(this.mysql);
   }
 
   private async getStartBlockNum() {
     let start = 0;
-    const lastBlock = await this.mysql.queryAsync('SELECT * FROM checkpoint LIMIT 1');
-    const nextBlock = lastBlock[0].number + 1;
+    let lastBlock = await this.store.getMetadataNumber('last_indexed_block');
+    lastBlock = lastBlock ?? 0;
+
+    const nextBlock = lastBlock + 1;
+
     this.config.sources.forEach(source => {
       start = start === 0 || start > source.start ? source.start : start;
     });
@@ -98,8 +110,9 @@ export default class Checkpoint {
     }
 
     await this.handleBlock(block);
-    const query = 'UPDATE checkpoint SET number = ?';
-    await this.mysql.queryAsync(query, [block.block_number]);
+
+    await this.store.setMetadata('last_indexed_block', block.block_number);
+
     return this.next(blockNum + 1);
   }
 
@@ -147,6 +160,14 @@ export default class Checkpoint {
     }
 
     this.log.debug({ txIndex: tx.transaction_index }, 'handling transaction done');
+  }
+
+  private get store(): CheckpointsStore {
+    if (this.checkpointsStore) {
+      return this.checkpointsStore;
+    }
+
+    return (this.checkpointsStore = new CheckpointsStore(this.mysql, this.log));
   }
 
   private get mysql(): AsyncMySqlPool {
