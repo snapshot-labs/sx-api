@@ -1,4 +1,4 @@
-import { Provider } from 'starknet';
+import { GetBlockResponse, Provider } from 'starknet';
 import { starknetKeccak } from 'starknet/utils/hash';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import Promise from 'bluebird';
@@ -6,40 +6,29 @@ import getGraphQL from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
-
-export interface CheckpointOptions {
-  // Set the log output levels for checkpoint. Defaults to Error.
-  // Note, this does not affect the log outputs in writers.
-  logLevel?: LogLevel;
-  // optionally format logs to pretty output.
-  // will require installing pino-pretty. Not recommended for production.
-  prettifyLogs?: boolean;
-  // Optional database connection screen. For now only accepts mysql database
-  // connection string. If no provided will default to looking up a value in
-  // the DATABASE_URL environment.
-  dbConnection?: string;
-}
+import { CheckpointConfig, CheckpointOptions } from './types';
+import { getContractFromCheckpointConfig } from './utils/checkpoint';
 
 export default class Checkpoint {
   public config;
   public writer;
   public schema: string;
   public provider: Provider;
-  public checkpoints: number[];
 
   private readonly entityController: GqlEntityController;
   private readonly log: Logger;
+  private readonly sourceContracts: string[];
 
   private mysqlPool?: AsyncMySqlPool;
   private mysqlConnection?: string;
 
-  constructor(config, writer, schema: string, checkpoints: number[], opts?: CheckpointOptions) {
+  constructor(config: CheckpointConfig, writer, schema: string, opts?: CheckpointOptions) {
     this.config = config;
     this.writer = writer;
     this.schema = schema;
     this.entityController = new GqlEntityController(schema);
     this.provider = new Provider({ network: this.config.network });
-    this.checkpoints = checkpoints;
+    this.sourceContracts = getContractFromCheckpointConfig(config);
 
     this.log = createLogger({
       base: { component: 'checkpoint' },
@@ -89,13 +78,16 @@ export default class Checkpoint {
     return nextBlock > start ? nextBlock : start;
   }
 
-  private async next(blockNum: number) {
-    const cps = this.checkpoints.filter(cp => cp >= blockNum);
-    if (cps.length > 0) blockNum = cps[0];
-    let block: any;
+  private async getNextBlockNumber(blockNumber: number) {}
 
+  private async next(blockNum: number) {
+    //this.mysql.queryAsync(
+    //'SELECT * FROM _checkpoints WHERE block_number = ? AND contract_address IN ?',
+    //[blockNum, [this.sourceContracts]]
+    //);
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
+    let block: GetBlockResponse;
     try {
       block = await this.provider.getBlock(blockNum);
     } catch (e) {
@@ -104,16 +96,17 @@ export default class Checkpoint {
       await Promise.delay(12e3);
       return this.next(blockNum);
     }
+
     await this.handleBlock(block);
     const query = 'UPDATE checkpoint SET number = ?';
     await this.mysql.queryAsync(query, [block.block_number]);
     return this.next(blockNum + 1);
   }
 
-  private async handleBlock(block) {
+  private async handleBlock(block: GetBlockResponse) {
     this.log.info({ blockNumber: block.block_number }, 'handling block');
 
-    for (const receipt of block.transaction_receipts) {
+    for (const receipt of Object.values(block.transaction_receipts)) {
       await this.handleTx(block, block.transactions[receipt.transaction_index], receipt);
     }
 
