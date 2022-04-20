@@ -21,6 +21,11 @@ type ToString = {
   toString: () => string;
 };
 
+export interface CheckpointRecord {
+  blockNumber: number;
+  contractAddress: string;
+}
+
 /**
  * Checkpoints store is a data store class for managing
  * checkpoints data schema and records.
@@ -85,6 +90,17 @@ export class CheckpointsStore {
     await this.mysql.queryAsync(`REPLACE INTO ${Table.Metadata} VALUES (?,?)`, [
       id,
       value.toString()
+    ]);
+  }
+
+  public async insertCheckpoints(checkpoints: CheckpointRecord[]): Promise<void> {
+    if (checkpoints.length === 0) {
+      return;
+    }
+    await this.mysql.queryAsync(`INSERT IGNORE INTO ${Table.Checkpoints} VALUES ?`, [
+      checkpoints.map(checkpoint => {
+        return [checkpoint.blockNumber, checkpoint.contractAddress];
+      })
     ]);
   }
 }

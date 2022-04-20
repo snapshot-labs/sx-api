@@ -8,7 +8,7 @@ import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { CheckpointConfig, CheckpointOptions } from './types';
 import { getContractFromCheckpointConfig } from './utils/checkpoint';
-import { CheckpointsStore } from './stores/checkpoints';
+import { CheckpointRecord, CheckpointsStore } from './stores/checkpoints';
 
 export default class Checkpoint {
   public config;
@@ -75,6 +75,28 @@ export default class Checkpoint {
     await this.store.createStore();
 
     await this.entityController.createEntityStores(this.mysql);
+  }
+
+  /**
+   * Registers the blocks to use as a skip list for checkpoint while
+   * indexing relevant blocks. Using this seed function can significantly
+   * reduce the time for Checkpoint to re-index blocks.
+   *
+   * This should be called before the start() method is called.
+   *
+   */
+  public async seedCheckpoint(blocks: number[]): Promise<void> {
+    await this.store.createStore();
+
+    const checkpoints: CheckpointRecord[] = [];
+
+    this.sourceContracts.forEach(contractAddress => {
+      blocks.forEach(blockNumber => {
+        checkpoints.push({ blockNumber, contractAddress });
+      });
+    });
+
+    await this.store.insertCheckpoints(checkpoints);
   }
 
   private async getStartBlockNum() {

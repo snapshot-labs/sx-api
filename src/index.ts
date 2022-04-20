@@ -18,7 +18,7 @@ const checkpoint = new Checkpoint(config, writer, schema, {
   prettifyLogs: process.env.NODE_ENV !== 'production'
 });
 checkpoint.reset();
-checkpoint.start();
+checkpoint.seedCheckpoint(checkpoints).then(() => checkpoint.start());
 
 const app = express();
 const PORT = process.env.PORT || 3000;
