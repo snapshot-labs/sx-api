@@ -23,6 +23,7 @@ export default class Checkpoint {
   private mysqlPool?: AsyncMySqlPool;
   private mysqlConnection?: string;
   private checkpointsStore?: CheckpointsStore;
+  private cpBlocksCache: number[] | null;
 
   constructor(config: CheckpointConfig, writer, schema: string, opts?: CheckpointOptions) {
     this.config = config;
@@ -31,6 +32,7 @@ export default class Checkpoint {
     this.entityController = new GqlEntityController(schema);
     this.provider = new Provider({ network: this.config.network });
     this.sourceContracts = getContractFromCheckpointConfig(config);
+    this.cpBlocksCache = [];
 
     this.log = createLogger({
       base: { component: 'checkpoint' },
@@ -61,6 +63,8 @@ export default class Checkpoint {
 
   public async start() {
     this.log.debug('starting');
+
+    // TODO(perfectmak): Validate config before starting
 
     await this.store.createStore();
 
@@ -115,10 +119,11 @@ export default class Checkpoint {
   private async getNextBlockNumber(blockNumber: number) {}
 
   private async next(blockNum: number) {
-    //this.mysql.queryAsync(
-    //'SELECT * FROM _checkpoints WHERE block_number = ? AND contract_address IN ?',
-    //[blockNum, [this.sourceContracts]]
-    //);
+    const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
+    if (checkpointBlock) {
+      blockNum = checkpointBlock;
+    }
+
     this.log.debug({ blockNumber: blockNum }, 'next block');
 
     let block: GetBlockResponse;
@@ -136,6 +141,34 @@ export default class Checkpoint {
     await this.store.setMetadata('last_indexed_block', block.block_number);
 
     return this.next(blockNum + 1);
+  }
+
+  private async getNextCheckpointBlock(blockNum: number): Promise<number | null> {
+    if (this.cpBlocksCache === null) {
+      // cache is null when we can no more find a record in the database
+      // so exiting early here to avoid polling the database in subsequent
+      // loops.
+      return null;
+    }
+
+    if (this.cpBlocksCache.length !== 0) {
+      return this.cpBlocksCache.shift();
+    }
+
+    const checkpointBlocks = await this.store.getNextCheckpointBlocks(
+      blockNum,
+      this.sourceContracts
+    );
+    if (checkpointBlocks.length === 0) {
+      this.log.info({ blockNumber: blockNum }, 'no more checkpoint blocks in store');
+      // disabling cache to stop polling database
+      this.cpBlocksCache = null;
+
+      return null;
+    }
+
+    this.cpBlocksCache = checkpointBlocks;
+    return this.cpBlocksCache.shift();
   }
 
   private async handleBlock(block: GetBlockResponse) {

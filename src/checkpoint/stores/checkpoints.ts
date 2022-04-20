@@ -33,14 +33,18 @@ export interface CheckpointRecord {
  * It interacts with an underlying mysql database.
  */
 export class CheckpointsStore {
-  constructor(private readonly mysql: AsyncMySqlPool, private readonly log: Logger) {}
+  private readonly log: Logger;
+
+  constructor(private readonly mysql: AsyncMySqlPool, log: Logger) {
+    this.log = log.child({ component: 'checkpoints_store' });
+  }
 
   public async createStore(): Promise<void> {
     this.log.debug('creating checkpoints tables...');
 
     let sql = `CREATE TABLE IF NOT EXISTS ${Table.Checkpoints} (
       ${Fields.Checkpoints.BlockNumber} BIGINT NOT NULL,
-      ${Fields.Checkpoints.ContractAddress} VARCHAR(65) NOT NULL,
+      ${Fields.Checkpoints.ContractAddress} VARCHAR(66) NOT NULL,
       PRIMARY KEY (${Fields.Checkpoints.BlockNumber}, ${Fields.Checkpoints.ContractAddress})
     );`;
 
@@ -64,14 +68,14 @@ export class CheckpointsStore {
     this.log.debug('checkpoints tables deleted');
   }
 
-  public async getMetadata(id: string): Promise<string | undefined> {
+  public async getMetadata(id: string): Promise<string | null> {
     const value = await this.mysql.queryAsync(
       `SELECT ${Fields.Metadata.Value} FROM ${Table.Metadata} WHERE ${Fields.Metadata.Id} = ? LIMIT 1`,
       [id]
     );
 
     if (value.length == 0) {
-      return undefined;
+      return null;
     }
 
     return value[0][Fields.Metadata.Value];
@@ -102,5 +106,32 @@ export class CheckpointsStore {
         return [checkpoint.blockNumber, checkpoint.contractAddress];
       })
     ]);
+  }
+
+  /**
+   * Fetch list of checkpoint blocks greater than or equal to the
+   * block number arguments, that have some events related to the
+   * contracts in the lists.
+   *
+   * By default this returns at most 15 next blocks. This return limit
+   * can be modified by the limit command.
+   */
+  public async getNextCheckpointBlocks(
+    block: number,
+    contracts: string[],
+    limit: number = 15
+  ): Promise<number[]> {
+    const result = await this.mysql.queryAsync(
+      `SELECT ${Fields.Checkpoints.BlockNumber} FROM ${Table.Checkpoints} 
+      WHERE ${Fields.Checkpoints.BlockNumber} >= ?
+        AND ${Fields.Checkpoints.ContractAddress} IN (?)
+      ORDER BY ${Fields.Checkpoints.BlockNumber} ASC
+      LIMIT ?`,
+      [block, contracts, limit]
+    );
+
+    this.log.debug({ result, block, contracts }, 'next checkpoint blocks');
+
+    return result.map(value => value[Fields.Checkpoints.BlockNumber]);
   }
 }
