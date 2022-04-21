@@ -19,7 +19,7 @@ const checkpoint = new Checkpoint(config, writer, schema, {
 });
 checkpoint.reset();
 
-checkpoint.seedCheckpoint(checkpoints).then(() => checkpoint.start());
+checkpoint.seedCheckpoints(checkpoints).then(() => checkpoint.start());
 
 const app = express();
 const PORT = process.env.PORT || 3000;

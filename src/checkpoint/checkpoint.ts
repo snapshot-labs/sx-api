@@ -82,21 +82,24 @@ export default class Checkpoint {
   }
 
   /**
-   * Registers the blocks to use as a skip list for checkpoint while
+   * Registers the blocks where a contracts event can be found.
+   * This will be used as a skip list for checkpoints while
    * indexing relevant blocks. Using this seed function can significantly
    * reduce the time for Checkpoint to re-index blocks.
    *
    * This should be called before the start() method is called.
    *
    */
-  public async seedCheckpoint(blocks: number[]): Promise<void> {
+  public async seedCheckpoints(
+    checkpointBlocks: { contract: string; blocks: number[] }[]
+  ): Promise<void> {
     await this.store.createStore();
 
     const checkpoints: CheckpointRecord[] = [];
 
-    this.sourceContracts.forEach(contractAddress => {
-      blocks.forEach(blockNumber => {
-        checkpoints.push({ blockNumber, contractAddress });
+    checkpointBlocks.forEach(cp => {
+      cp.blocks.forEach(blockNumber => {
+        checkpoints.push({ blockNumber, contractAddress: cp.contract });
       });
     });
 
