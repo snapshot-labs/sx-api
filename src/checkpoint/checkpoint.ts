@@ -61,22 +61,38 @@ export default class Checkpoint {
     });
   }
 
+  /**
+   * Starts the indexer.
+   *
+   * The indexer will invoker the respective writer functions when a contract
+   * event is found.
+   *
+   */
   public async start() {
     this.log.debug('starting');
-
-    // TODO(perfectmak): Validate config before starting
-
-    await this.store.createStore();
 
     const blockNum = await this.getStartBlockNum();
     return await this.next(blockNum);
   }
 
+  /**
+   * Reset will clear the last synced block informations
+   * and force Checkpoint to start indexing from the start
+   * block.
+   *
+   * This will also clear all indexed GraphQL entity records.
+   *
+   * This should be called when there has been a change to the GraphQL schema
+   * or a change to the writer functions logic, so indexing will re-run from
+   * the starting block. Also, it should be called the first time Checkpoint
+   * is being initialized.
+   *
+   */
   public async reset() {
     this.log.debug('reset');
 
-    await this.store.deleteStore();
     await this.store.createStore();
+    await this.store.setMetadata('last_indexed_block', 0);
 
     await this.entityController.createEntityStores(this.mysql);
   }

@@ -39,6 +39,11 @@ export class CheckpointsStore {
     this.log = log.child({ component: 'checkpoints_store' });
   }
 
+  /**
+   * Creates the core database tables to make Checkpoint run effectively.
+   *
+   * This only creates the tables if they don't exist.
+   */
   public async createStore(): Promise<void> {
     this.log.debug('creating checkpoints tables...');
 
@@ -56,16 +61,6 @@ export class CheckpointsStore {
 
     await this.mysql.queryAsync(sql);
     this.log.debug('checkpoints tables created');
-  }
-
-  public async deleteStore(): Promise<void> {
-    this.log.debug('deleting checkpoints tables...');
-
-    let sql = `DROP TABLE IF EXISTS ${Table.Checkpoints};\n`;
-    sql += `DROP TABLE IF EXISTS ${Table.Metadata};\n`;
-
-    await this.mysql.queryAsync(sql.trimEnd());
-    this.log.debug('checkpoints tables deleted');
   }
 
   public async getMetadata(id: string): Promise<string | null> {
