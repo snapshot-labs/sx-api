@@ -18,9 +18,9 @@ import {
   GraphQLString,
   Source
 } from 'graphql';
-import { AsyncMySqlPool } from '../mysql';
+import { AsyncMySqlPool } from '../../mysql';
 
-import { querySingle, queryMulti, ResolverContext } from './resolvers';
+import { querySingle, queryMulti, ResolverContext } from '../resolvers';
 
 /**
  * Type for single and multiple query resolvers
@@ -83,12 +83,12 @@ export class GqlEntityController {
    * ```
    *
    */
-  public createEntityQuerySchema(
+  public generateQueryFields(
     resolvers: EntityQueryResolvers = {
       singleEntityResolver: querySingle,
       multipleEntityResolver: queryMulti
     }
-  ): GraphQLObjectType {
+  ): GraphQLFieldConfigMap<any, any> {
     const queryFields: GraphQLFieldConfigMap<any, any> = {};
 
     this.schemaObjects.forEach(type => {
@@ -102,10 +102,7 @@ export class GqlEntityController {
       );
     });
 
-    return new GraphQLObjectType({
-      name: 'Query',
-      fields: queryFields
-    });
+    return queryFields;
   }
 
   /**

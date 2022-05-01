@@ -1,10 +1,11 @@
-import { GraphQLSchema, printSchema } from 'graphql';
+import { GraphQLObjectType, GraphQLSchema, printSchema } from 'graphql';
 import { mock } from 'jest-mock-extended';
-import { GqlEntityController } from '../../../../src/checkpoint/graphql/controller';
+import { GqlCheckpointController } from '../../../../src/checkpoint/graphql/controllers/checkpoint';
+import { GqlEntityController } from '../../../../src/checkpoint/graphql/controllers/entity';
 import { AsyncMySqlPool } from '../../../../src/checkpoint/mysql';
 
 describe('GqlEntityController', () => {
-  describe('createEntityQuerySchema', () => {
+  describe('generateQueryFields', () => {
     it('should work', () => {
       const controller = new GqlEntityController(`
 type Vote {
@@ -12,7 +13,11 @@ type Vote {
   name: String
 }
   `);
-      const querySchema = controller.createEntityQuerySchema();
+      const queryFields = controller.generateQueryFields();
+      const querySchema = new GraphQLObjectType({
+        name: 'Query',
+        fields: queryFields
+      });
 
       const schema = printSchema(new GraphQLSchema({ query: querySchema }));
       expect(schema).toMatchSnapshot();
@@ -34,7 +39,7 @@ type Vote {
       }
     ])('should fail for $reason', ({ schema }) => {
       const controller = new GqlEntityController(schema);
-      expect(() => controller.createEntityQuerySchema()).toThrowErrorMatchingSnapshot();
+      expect(() => controller.generateQueryFields()).toThrowErrorMatchingSnapshot();
     });
   });
 
@@ -50,6 +55,31 @@ type Vote {
       await controller.createEntityStores(mockMysql);
 
       expect(mockMysql.queryAsync).toMatchSnapshot();
+    });
+  });
+});
+
+describe('GqlCheckpointController', () => {
+  describe('generateQueryFields', () => {
+    it('should work', () => {
+      const controller = new GqlCheckpointController();
+      const queryFields = controller.generateQueryFields();
+      const querySchema = new GraphQLObjectType({
+        name: 'Query',
+        fields: queryFields
+      });
+      const schema = printSchema(new GraphQLSchema({ query: querySchema }));
+
+      expect(schema).toMatchSnapshot();
+    });
+
+    it('should prefix all fields with underscore', () => {
+      const controller = new GqlCheckpointController();
+      const queryFields = controller.generateQueryFields();
+
+      Object.keys(queryFields).forEach(fieldName => {
+        expect(fieldName.substring(0, 1)).toEqual('_');
+      });
     });
   });
 });

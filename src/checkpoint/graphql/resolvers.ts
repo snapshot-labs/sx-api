@@ -1,4 +1,5 @@
 import { AsyncMySqlPool } from '../mysql';
+import { CheckpointsStore, MetadataId } from '../stores/checkpoints';
 import { Logger } from '../utils/logger';
 
 /**
@@ -7,6 +8,7 @@ import { Logger } from '../utils/logger';
 export interface ResolverContext {
   log: Logger;
   mysql: AsyncMySqlPool;
+  checkpointsStore: CheckpointsStore;
 }
 
 export async function queryMulti(parent, args, context: ResolverContext, info) {
@@ -40,4 +42,8 @@ export async function querySingle(parent, args, context: ResolverContext, info) 
 
   const [item] = await mysql.queryAsync(query, [args.id]);
   return item;
+}
+
+export async function queryLastIndexedBlock(_parent, _args, ctx: ResolverContext) {
+  return ctx.checkpointsStore.getMetadataNumber(MetadataId.LastIndexedBlock);
 }

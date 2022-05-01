@@ -27,6 +27,14 @@ export interface CheckpointRecord {
 }
 
 /**
+ * Metadata Ids stored in the CheckpointStore.
+ *
+ */
+export enum MetadataId {
+  LastIndexedBlock = 'last_indexed_block'
+}
+
+/**
  * Checkpoints store is a data store class for managing
  * checkpoints data schema and records.
  *

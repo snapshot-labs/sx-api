@@ -3,12 +3,14 @@ import { starknetKeccak } from 'starknet/utils/hash';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import Promise from 'bluebird';
 import getGraphQL from './graphql';
-import { GqlEntityController } from './graphql/controller';
+import { GqlEntityController } from './graphql/controllers/entity';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
 import { CheckpointConfig, CheckpointOptions, SupportedNetworkName } from './types';
 import { getContractsFromConfig } from './utils/checkpoint';
-import { CheckpointRecord, CheckpointsStore } from './stores/checkpoints';
+import { CheckpointRecord, CheckpointsStore, MetadataId } from './stores/checkpoints';
+import { GraphQLFieldConfigMap, GraphQLInt, GraphQLObjectType, GraphQLString } from 'graphql';
+import { GqlCheckpointController } from './graphql/controllers/checkpoint';
 
 export default class Checkpoint {
   public config: CheckpointConfig;
@@ -17,6 +19,7 @@ export default class Checkpoint {
   public provider: Provider;
 
   private readonly entityController: GqlEntityController;
+  private readonly checkpointController: GqlCheckpointController;
   private readonly log: Logger;
   private readonly sourceContracts: string[];
 
@@ -30,6 +33,7 @@ export default class Checkpoint {
     this.writer = writer;
     this.schema = schema;
     this.entityController = new GqlEntityController(schema);
+    this.checkpointController = new GqlCheckpointController();
     this.provider = new Provider({ network: this.config.network as SupportedNetworkName });
     this.sourceContracts = getContractsFromConfig(config);
     this.cpBlocksCache = [];
@@ -55,9 +59,21 @@ export default class Checkpoint {
    *
    */
   public get graphql() {
-    return getGraphQL(this.entityController.createEntityQuerySchema(), {
+    const entityQueryFields = this.entityController.generateQueryFields();
+    const coreQueryFields = this.checkpointController.generateQueryFields();
+
+    const querySchema = new GraphQLObjectType({
+      name: 'Query',
+      fields: {
+        ...entityQueryFields,
+        ...coreQueryFields
+      }
+    });
+
+    return getGraphQL(querySchema, {
       log: this.log.child({ component: 'resolver' }),
-      mysql: this.mysql
+      mysql: this.mysql,
+      checkpointsStore: this.store
     });
   }
 
@@ -92,7 +108,7 @@ export default class Checkpoint {
     this.log.debug('reset');
 
     await this.store.createStore();
-    await this.store.setMetadata('last_indexed_block', 0);
+    await this.store.setMetadata(MetadataId.LastIndexedBlock, 0);
 
     await this.entityController.createEntityStores(this.mysql);
   }
@@ -124,7 +140,7 @@ export default class Checkpoint {
 
   private async getStartBlockNum() {
     let start = 0;
-    let lastBlock = await this.store.getMetadataNumber('last_indexed_block');
+    let lastBlock = await this.store.getMetadataNumber(MetadataId.LastIndexedBlock);
     lastBlock = lastBlock ?? 0;
 
     const nextBlock = lastBlock + 1;
@@ -157,7 +173,7 @@ export default class Checkpoint {
 
     await this.handleBlock(block);
 
-    await this.store.setMetadata('last_indexed_block', block.block_number);
+    await this.store.setMetadata(MetadataId.LastIndexedBlock, block.block_number);
 
     return this.next(blockNum + 1);
   }
