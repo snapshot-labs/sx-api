@@ -73,7 +73,8 @@ export default class Checkpoint {
     return getGraphQL(querySchema, {
       log: this.log.child({ component: 'resolver' }),
       mysql: this.mysql,
-      checkpointsStore: this.store
+      checkpointsStore: this.store,
+      starknetProvider: this.provider
     });
   }
 

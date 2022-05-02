@@ -1,3 +1,4 @@
+import { Provider } from 'starknet';
 import { AsyncMySqlPool } from '../mysql';
 import { CheckpointsStore, MetadataId } from '../stores/checkpoints';
 import { Logger } from '../utils/logger';
@@ -9,6 +10,7 @@ export interface ResolverContext {
   log: Logger;
   mysql: AsyncMySqlPool;
   checkpointsStore: CheckpointsStore;
+  starknetProvider: Provider;
 }
 
 export async function queryMulti(parent, args, context: ResolverContext, info) {
@@ -46,4 +48,12 @@ export async function querySingle(parent, args, context: ResolverContext, info) 
 
 export async function queryLastIndexedBlock(_parent, _args, ctx: ResolverContext) {
   return ctx.checkpointsStore.getMetadataNumber(MetadataId.LastIndexedBlock);
+}
+
+// returns the latest starknet block visible to this node.
+export async function queryLatestStarknetBlock(_parent, _args, ctx: ResolverContext) {
+  // this might need some rate limiting to avoid being abused
+  // because it is quite slow.
+  const latestBlock = await ctx.starknetProvider.getBlock();
+  return latestBlock.block_number;
 }

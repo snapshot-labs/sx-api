@@ -10,6 +10,13 @@ exports[`GqlCheckpointController generateQueryFields should work 1`] = `
 "type Query {
   \\"\\"\\"Fetch the last block Checkpoint has processed.\\"\\"\\"
   _last_indexed_block: Int
+
+  \\"\\"\\"
+  Fetch the latest block number on Starknet.
+          Useful for comparing how far behind this Checkpoint's _last_indexed_block is behind the latest block. 
+        NOTE: Querying this field can be quite slow.
+  \\"\\"\\"
+  _latest_starknet_block: Int
 }"
 `;
 
