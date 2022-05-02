@@ -1,0 +1,27 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`queryCheckpoints should throw if size exceeds allowed max block 1`] = `"query 'size' exceeds max value. max value is 1000"`;
+
+exports[`queryCheckpoints should work with appropriate defaults 1`] = `
+Array [
+  Array [
+    0,
+    Array [
+      "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
+    ],
+    100,
+  ],
+]
+`;
+
+exports[`queryCheckpoints should work with custom block arguments 1`] = `
+Array [
+  Array [
+    5100,
+    Array [
+      "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
+    ],
+    500,
+  ],
+]
+`;

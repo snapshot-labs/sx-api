@@ -57,3 +57,21 @@ export async function queryLatestStarknetBlock(_parent, _args, ctx: ResolverCont
   const latestBlock = await ctx.starknetProvider.getBlock();
   return latestBlock.block_number;
 }
+
+const MaxCheckpointQuerySize = 1000;
+export async function queryCheckpoints(_parent, args, ctx: ResolverContext) {
+  const fromBlock = args.fromBlock || 0;
+  const contracts = [args.contract];
+  const size = args.size || 100;
+
+  if (size > MaxCheckpointQuerySize) {
+    throw new Error(`query 'size' exceeds max value. max value is ${MaxCheckpointQuerySize}`);
+  }
+
+  const checkpoints = await ctx.checkpointsStore.getNextCheckpointBlocks(
+    fromBlock,
+    contracts,
+    size
+  );
+  return checkpoints;
+}

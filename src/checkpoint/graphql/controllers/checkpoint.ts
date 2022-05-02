@@ -1,5 +1,17 @@
-import { GraphQLField, GraphQLFieldConfig, GraphQLFieldConfigMap, GraphQLInt } from 'graphql';
-import { queryLastIndexedBlock, queryLatestStarknetBlock, ResolverContext } from '../resolvers';
+import {
+  GraphQLFieldConfig,
+  GraphQLFieldConfigMap,
+  GraphQLInt,
+  GraphQLList,
+  GraphQLNonNull,
+  GraphQLString
+} from 'graphql';
+import {
+  queryCheckpoints,
+  queryLastIndexedBlock,
+  queryLatestStarknetBlock,
+  ResolverContext
+} from '../resolvers';
 
 /**
  * Controller for generating query and mutation schemas relating
@@ -18,7 +30,8 @@ export class GqlCheckpointController {
   public generateQueryFields(): GraphQLFieldConfigMap<any, ResolverContext> {
     return {
       _last_indexed_block: this.lastIndexedBlockField(),
-      _latest_starknet_block: this.latestStarknetBlockField()
+      _latest_starknet_block: this.latestStarknetBlockField(),
+      _checkpoints: this.checkpointsField()
     };
   }
 
@@ -37,6 +50,29 @@ export class GqlCheckpointController {
         Useful for comparing how far behind this Checkpoint's _last_indexed_block is behind the latest block. 
       NOTE: Querying this field can be quite slow.`,
       resolve: queryLatestStarknetBlock
+    };
+  }
+
+  private checkpointsField(): GraphQLFieldConfig<any, ResolverContext> {
+    return {
+      type: new GraphQLList(GraphQLInt),
+      description: 'Fetch starknet blocks (checkpoints) where a contracts interaction exists.',
+      args: {
+        contract: {
+          type: new GraphQLNonNull(GraphQLString),
+          description: 'contract address to fetch checkpoint blocks'
+        },
+        fromBlock: {
+          type: GraphQLInt,
+          description: 'filter result starting from this block'
+        },
+        size: {
+          type: GraphQLInt,
+          description:
+            'maximum size of blocks to return in results. defaults to 100. Max possible value is 1000.'
+        }
+      },
+      resolve: queryCheckpoints
     };
   }
 }

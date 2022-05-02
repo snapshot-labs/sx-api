@@ -17,6 +17,22 @@ exports[`GqlCheckpointController generateQueryFields should work 1`] = `
         NOTE: Querying this field can be quite slow.
   \\"\\"\\"
   _latest_starknet_block: Int
+
+  \\"\\"\\"
+  Fetch starknet blocks (checkpoints) where a contracts interaction exists.
+  \\"\\"\\"
+  _checkpoints(
+    \\"\\"\\"contract address to fetch checkpoint blocks\\"\\"\\"
+    contract: String!
+
+    \\"\\"\\"filter result starting from this block\\"\\"\\"
+    fromBlock: Int
+
+    \\"\\"\\"
+    maximum size of blocks to return in results. defaults to 100. Max possible value is 1000.
+    \\"\\"\\"
+    size: Int
+  ): [Int]
 }"
 `;
 
