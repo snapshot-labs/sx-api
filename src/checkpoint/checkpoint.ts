@@ -151,8 +151,6 @@ export default class Checkpoint {
     return nextBlock > start ? nextBlock : start;
   }
 
-  private async getNextBlockNumber(blockNumber: number) {}
-
   private async next(blockNum: number) {
     const checkpointBlock = await this.getNextCheckpointBlock(blockNum);
     if (checkpointBlock) {
