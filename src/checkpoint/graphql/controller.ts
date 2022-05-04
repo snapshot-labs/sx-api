@@ -83,15 +83,18 @@ export class GqlEntityController {
    * ```
    *
    */
-  public createEntityQuerySchema(
+  public generateQueryFields(
+    schemaObjects?: GraphQLObjectType[],
     resolvers: EntityQueryResolvers = {
       singleEntityResolver: querySingle,
       multipleEntityResolver: queryMulti
     }
-  ): GraphQLObjectType {
+  ): GraphQLFieldConfigMap<any, any> {
+    schemaObjects = schemaObjects || this.schemaObjects;
+
     const queryFields: GraphQLFieldConfigMap<any, any> = {};
 
-    this.schemaObjects.forEach(type => {
+    schemaObjects.forEach(type => {
       queryFields[type.name.toLowerCase()] = this.getSingleEntityQueryConfig(
         type,
         resolvers.singleEntityResolver
@@ -102,10 +105,7 @@ export class GqlEntityController {
       );
     });
 
-    return new GraphQLObjectType({
-      name: 'Query',
-      fields: queryFields
-    });
+    return queryFields;
   }
 
   /**
@@ -166,6 +166,8 @@ export class GqlEntityController {
     // TODO(perfectmak): wrap this in a transaction
     return mysql.queryAsync(sql.trimEnd());
   }
+
+  public static generateQueryFields() {}
 
   /**
    * Returns a list of objects defined within the graphql typedefs.
