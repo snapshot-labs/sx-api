@@ -9,14 +9,6 @@ export interface ResolverContext {
   mysql: AsyncMySqlPool;
 }
 
-const getTableName = (fieldName: string): string => {
-  if (fieldName.startsWith('_')) {
-    return fieldName;
-  }
-
-  return `${fieldName}s`;
-};
-
 export async function queryMulti(parent, args, context: ResolverContext, info) {
   const { log, mysql } = context;
 
@@ -34,9 +26,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
   const orderDirection = 'DESC';
   params.push(skip, first);
 
-  const query = `SELECT * FROM ${getTableName(
-    info.fieldName
-  )} ${whereSql} ORDER BY ${orderBy} ${orderDirection} LIMIT ?, ?`;
+  const query = `SELECT * FROM ${info.fieldName} ${whereSql} ORDER BY ${orderBy} ${orderDirection} LIMIT ?, ?`;
   log.debug({ sql: query, args }, 'executing multi query');
 
   return await mysql.queryAsync(query, params);
@@ -45,7 +35,7 @@ export async function queryMulti(parent, args, context: ResolverContext, info) {
 export async function querySingle(parent, args, context: ResolverContext, info) {
   const { log, mysql } = context;
 
-  const query = `SELECT * FROM ${getTableName(info.fieldName)} WHERE id = ? LIMIT 1`;
+  const query = `SELECT * FROM ${info.fieldName}s WHERE id = ? LIMIT 1`;
   log.debug({ sql: query, args }, 'executing single query');
 
   const [item] = await mysql.queryAsync(query, [args.id]);
