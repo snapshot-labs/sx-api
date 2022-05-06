@@ -1,5 +1,6 @@
 import {
   buildSchema,
+  GraphQLEnumType,
   GraphQLField,
   GraphQLFieldConfig,
   GraphQLFieldConfigMap,
@@ -29,6 +30,14 @@ interface EntityQueryResolvers<Context = ResolverContext> {
   singleEntityResolver: GraphQLFieldResolver<unknown, Context>;
   multipleEntityResolver: GraphQLFieldResolver<unknown, Context>;
 }
+
+const GraphQLOrderDirection = new GraphQLEnumType({
+  name: 'OrderDirection',
+  values: {
+    asc: { value: 'ASC' },
+    desc: { value: 'DESC' }
+  }
+});
 
 /**
  * Controller for performing actions based on the graphql schema provided to its
@@ -251,7 +260,7 @@ export class GqlEntityController {
           type: GraphQLString
         },
         orderDirection: {
-          type: GraphQLString
+          type: GraphQLOrderDirection
         },
         where: { type: new GraphQLInputObjectType(whereInputConfig) }
       },
