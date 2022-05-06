@@ -9,7 +9,7 @@ Array [
       contract_address VARCHAR(66) NOT NULL,
       PRIMARY KEY (id)
     );
-CREATE TABLE IF NOT EXISTS _metadata (
+CREATE TABLE IF NOT EXISTS _metadatas (
       id VARCHAR(20) NOT NULL,
       value VARCHAR(128) NOT NULL,
       PRIMARY KEY (id)
