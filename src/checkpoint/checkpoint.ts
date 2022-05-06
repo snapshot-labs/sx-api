@@ -2,7 +2,7 @@ import { GetBlockResponse, Provider } from 'starknet';
 import { starknetKeccak } from 'starknet/utils/hash';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import Promise from 'bluebird';
-import getGraphQL, { MetadataGraphQLObject } from './graphql';
+import getGraphQL, { CheckpointsGraphQLObject, MetadataGraphQLObject } from './graphql';
 import { GqlEntityController } from './graphql/controller';
 import { createLogger, Logger, LogLevel } from './utils/logger';
 import { AsyncMySqlPool, createMySqlPool } from './mysql';
@@ -57,7 +57,10 @@ export default class Checkpoint {
    */
   public get graphql() {
     const entityQueryFields = this.entityController.generateQueryFields();
-    const coreQueryFields = this.entityController.generateQueryFields([MetadataGraphQLObject]);
+    const coreQueryFields = this.entityController.generateQueryFields([
+      MetadataGraphQLObject,
+      CheckpointsGraphQLObject
+    ]);
 
     const querySchema = new GraphQLObjectType({
       name: 'Query',
