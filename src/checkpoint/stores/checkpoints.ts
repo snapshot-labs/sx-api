@@ -3,7 +3,7 @@ import { Logger } from '../utils/logger';
 
 const Table = {
   Checkpoints: '_checkpoints',
-  Metadata: '_metadata'
+  Metadata: '_metadatas' // using plural names to confirm with standards entities
 };
 
 const Fields = {
