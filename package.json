@@ -11,7 +11,7 @@
     "test": "jest"
   },
   "dependencies": {
-    "@ethersproject/address": "^5.6.0",
+    "@ethersproject/address": "^5.6.1",
     "@ethersproject/bignumber": "^5.6.1",
     "@snapshot-labs/checkpoint": "^0.1.0-beta.0",
     "@snapshot-labs/sx": "^0.1.0-beta.0",
@@ -26,12 +26,12 @@
     "express": "^4.18.1",
     "nodemon": "^2.0.16",
     "starknet": "^3.7.0",
-    "ts-node": "^10.7.0",
+    "ts-node": "^10.8.1",
     "typescript": "^4.6.4"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^5.25.0",
-    "@typescript-eslint/parser": "^5.25.0",
+    "@typescript-eslint/parser": "^5.27.1",
     "eslint-plugin-prettier": "^4.0.0",
     "jest": "^27.5.1",
     "jest-mock-extended": "^2.0.6",
