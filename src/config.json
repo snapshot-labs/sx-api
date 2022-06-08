@@ -3,10 +3,14 @@
   "networkBaseUrl": "https://starknet-proxy-ikaz7.ondigitalocean.app",
   "sources": [
     {
-      "contract": "0x0625dc1290b6e936be5f1a3e963cf629326b1f4dfd5a56738dea98e1ad31b7f3",
-      "start": 112319,
-      "deploy_fn": "handleDeploy",
+      "contract": "0x056f0102b537fae4a9f94c362473d7f03025e92af246502074d9f204c027058b",
+      "start": 221912,
+      "deploy_fn": "",
       "events": [
+        {
+          "name": "space_created",
+          "fn": "handleSpaceCreated"
+        },
         {
           "name": "proposal_created",
           "fn": "handlePropose"
