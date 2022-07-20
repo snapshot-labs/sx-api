@@ -1,4 +1,4 @@
-import { shortStringArrToStr } from '@snapshot-labs/sx';
+import { shortStringArrToStr } from '@snapshot-labs/sx/dist/utils/strings';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import { getJSON, toAddress, getEvent } from './utils';
 
@@ -14,8 +14,8 @@ export async function handleSpaceCreated({ source, block, tx, receipt, mysql }) 
     voting_delay: BigInt(event.voting_delay).toString(),
     min_voting_period: BigInt(event.min_voting_period).toString(),
     max_voting_period: BigInt(event.max_voting_period).toString(),
-    proposal_threshold: BigInt(event.proposal_threshold[0]).toString(),
-    quorum: BigInt(event.quorum[0]).toString(),
+    proposal_threshold: event.proposal_threshold,
+    quorum: event.quorum,
     proposal_count: 0,
     vote_count: 0,
     created: block.timestamp,

@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import { getAddress } from '@ethersproject/address';
 import { BigNumber } from '@ethersproject/bignumber';
+import { SplitUint256 } from '@snapshot-labs/sx/dist/utils/split-uint256';
 
 export function toAddress(bn) {
   try {
@@ -45,7 +46,8 @@ export function getEvent(data: string[], format: string) {
       len = 0;
     } else {
       if (param.endsWith('(uint256)')) {
-        event[name] = data.slice(next, next + 2);
+        const uint256 = data.slice(next, next + 2);
+        event[name] = new SplitUint256(BigInt(uint256[0]), BigInt(uint256[1])).toUint().toString();
         skip += 1;
       } else {
         event[name] = data[next];
