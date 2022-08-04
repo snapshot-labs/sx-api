@@ -1,6 +1,6 @@
 {
   "network": "goerli-alpha",
-  "networkBaseUrl": "https://starknet-proxy-ikaz7.ondigitalocean.app",
+  "network_base_url": "https://starknet-proxy-ikaz7.ondigitalocean.app",
   "sources": [
     {
       "contract": "0x03a4cb1c6e4439e2ce2c43b565e6347f2f334cd3a387e86fb14f7655c9b6704a",
