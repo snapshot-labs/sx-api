@@ -29,7 +29,7 @@
     "typescript": "^4.7.4"
   },
   "devDependencies": {
-    "@snapshot-labs/eslint-config": "^0.1.0-beta.4",
+    "@snapshot-labs/eslint-config": "^0.1.0-beta.6",
     "jest": "^27.5.1",
     "jest-mock-extended": "^2.0.6",
     "ts-jest": "^27.1.4"
