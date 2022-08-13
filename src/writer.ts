@@ -3,13 +3,13 @@ import { shortStringArrToStr } from '@snapshot-labs/sx/dist/utils/strings';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import { getJSON, toAddress, getEvent } from './utils';
 
-export async function handleSpaceCreated({ block, tx, event, mysql }) {
+export async function handleSpaceCreated({ source, block, tx, receipt, mysql }) {
   console.log('Handle space created');
   const format =
-    'deployer_address, space_address, voting_delay, min_voting_period, max_voting_period, proposal_threshold(uint256), controller, quorum(uint256), voting_strategies_len, voting_strategies(felt*), authenticators_len, authenticators(felt*), executors_len, executors(felt*)';
-  event = getEvent(event.data, format);
+    'voting_delay, min_voting_period, max_voting_period, proposal_threshold(uint256), controller, quorum(uint256), voting_strategies_len, voting_strategies(felt*), authenticators_len, authenticators(felt*), executors_len, executor';
+  const event: any = getEvent(receipt.events[0].data, format);
   const item = {
-    id: validateAndParseAddress(event.space_address),
+    id: validateAndParseAddress(source.contract),
     name: 'Pistachio DAO',
     controller: validateAndParseAddress(event.controller),
     voting_delay: BigInt(event.voting_delay).toString(),
