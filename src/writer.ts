@@ -46,8 +46,8 @@ export async function handlePropose({ block, tx, event, mysql }) {
   const data: any = getEvent(event.data, format);
 
   const space = validateAndParseAddress(event.from_address);
-  const [{ strategies, strategies_params }] = await mysql.queryAsync(
-    'SELECT strategies, strategies_params FROM spaces WHERE id = ? LIMIT 1',
+  const [{ authenticators, strategies, strategies_params }] = await mysql.queryAsync(
+    'SELECT authenticators, strategies, strategies_params FROM spaces WHERE id = ? LIMIT 1',
     [space]
   );
   const proposal = parseInt(BigInt(data.proposal).toString());
@@ -90,6 +90,7 @@ export async function handlePropose({ block, tx, event, mysql }) {
     scores_2: 0,
     scores_3: 0,
     scores_total: 0,
+    authenticators,
     strategies,
     strategies_params,
     created: block.timestamp,

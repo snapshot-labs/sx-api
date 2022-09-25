@@ -37,6 +37,7 @@ type Proposal {
   min_end: Int
   max_end: Int
   snapshot: Int
+  authenticators: [String]
   strategies: [String]
   strategies_params: [String]
   scores_1: Float
