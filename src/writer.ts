@@ -2,6 +2,14 @@ import { formatUnits } from '@ethersproject/units';
 import { shortStringArrToStr } from '@snapshot-labs/sx/dist/utils/strings';
 import { validateAndParseAddress } from 'starknet/utils/address';
 import { getJSON, toAddress, getEvent, getSpaceName } from './utils';
+import { PrismaClient } from '@prisma/client';
+
+type CallbackArgs = {
+  block: any;
+  tx: any;
+  event: any;
+  prisma: PrismaClient;
+};
 
 function intSequenceToString(intSequence) {
   const sequenceStr = shortStringArrToStr(intSequence);
@@ -11,45 +19,53 @@ function intSequenceToString(intSequence) {
     .join('');
 }
 
-export async function handleSpaceCreated({ block, tx, event, mysql }) {
+export async function handleSpaceCreated({ block, tx, event, prisma }: CallbackArgs) {
   console.log('Handle space created');
   const format =
     'deployer_address, space_address, voting_delay, min_voting_period, max_voting_period, proposal_threshold(uint256), controller, quorum(uint256), strategies_len, strategies(felt*), strategies_params_len, strategies_params(felt*), authenticators_len, authenticators(felt*), executors_len, executors(felt*)';
   const data: any = getEvent(event.data, format);
 
-  const item = {
-    id: validateAndParseAddress(data.space_address),
-    name: getSpaceName(data.space_address),
-    controller: validateAndParseAddress(data.controller),
-    voting_delay: BigInt(data.voting_delay).toString(),
-    min_voting_period: BigInt(data.min_voting_period).toString(),
-    max_voting_period: BigInt(data.max_voting_period).toString(),
-    proposal_threshold: data.proposal_threshold,
-    quorum: data.quorum,
-    strategies: JSON.stringify(data.strategies),
-    strategies_params: JSON.stringify(data.strategies_params),
-    authenticators: JSON.stringify(data.authenticators),
-    executors: JSON.stringify(data.executors),
-    proposal_count: 0,
-    vote_count: 0,
-    created: block.timestamp,
-    tx: tx.transaction_hash
-  };
-  const query = `INSERT IGNORE INTO spaces SET ?;`;
-  await mysql.queryAsync(query, [item]);
+  await prisma.space.create({
+    data: {
+      id: validateAndParseAddress(data.space_address),
+      name: getSpaceName(data.space_address),
+      controller: validateAndParseAddress(data.controller),
+      voting_delay: BigInt(data.voting_delay),
+      min_voting_period: BigInt(data.min_voting_period),
+      max_voting_period: BigInt(data.max_voting_period),
+      proposal_threshold: Number(data.proposal_threshold),
+      quorum: Number(data.quorum),
+      strategies: data.strategies,
+      strategies_params: data.strategies_params,
+      authenticators: data.authenticators,
+      executors: data.executors,
+      about: '',
+      proposal_count: 0,
+      vote_count: 0,
+      created: block.timestamp,
+      tx: tx.transaction_hash
+    }
+  });
 }
 
-export async function handlePropose({ block, tx, event, mysql }) {
+export async function handlePropose({ block, tx, event, prisma }: CallbackArgs) {
   console.log('Handle propose');
   const format =
     'proposal, author, quorum(uint256), snapshot, start, min_end, max_end, executor, execution_hash, metadata_uri_len, metadata_uri(felt*)';
   const data: any = getEvent(event.data, format);
 
   const space = validateAndParseAddress(event.from_address);
-  const [{ strategies, strategies_params }] = await mysql.queryAsync(
-    'SELECT strategies, strategies_params FROM spaces WHERE id = ? LIMIT 1',
-    [space]
-  );
+
+  const { strategies, strategies_params } = await prisma.space.findFirstOrThrow({
+    where: {
+      id: space
+    },
+    select: {
+      strategies: true,
+      strategies_params: true
+    }
+  });
+
   const proposal = parseInt(BigInt(data.proposal).toString());
   const author = toAddress(data.author);
   let title = '';
@@ -73,8 +89,8 @@ export async function handlePropose({ block, tx, event, mysql }) {
   const item = {
     id: `${space}/${proposal}`,
     proposal_id: proposal,
-    space,
-    author,
+    space_id: space,
+    author_id: author,
     execution_hash: data.execution_hash,
     metadata_uri: metadataUri,
     title,
@@ -105,16 +121,18 @@ export async function handlePropose({ block, tx, event, mysql }) {
     created: block.timestamp
   };
 
-  const query = `
-    INSERT IGNORE INTO proposals SET ?;
-    UPDATE spaces SET proposal_count = proposal_count + 1 WHERE id = ? LIMIT 1;
-    INSERT IGNORE INTO users SET ?;
-    UPDATE users SET proposal_count = proposal_count + 1 WHERE id = ? LIMIT 1;
-  `;
-  await mysql.queryAsync(query, [item, item.space, user, author]);
+  await prisma.user.upsert({
+    where: { id: user.id },
+    update: {},
+    create: user
+  });
+
+  await prisma.proposal.create({
+    data: item
+  });
 }
 
-export async function handleVote({ block, event, mysql }) {
+export async function handleVote({ block, event, prisma }: CallbackArgs) {
   console.log('Handle vote');
   const format = 'proposal, voter, choice, vp';
   const data: any = getEvent(event.data, format);
@@ -127,9 +145,9 @@ export async function handleVote({ block, event, mysql }) {
 
   const item = {
     id: `${space}/${proposal}/${voter}`,
-    space,
+    space_id: space,
     proposal,
-    voter,
+    voter_id: voter,
     choice,
     vp,
     created: block.timestamp
@@ -143,20 +161,13 @@ export async function handleVote({ block, event, mysql }) {
     created: block.timestamp
   };
 
-  const query = `
-    INSERT IGNORE INTO votes SET ?;
-    UPDATE spaces SET vote_count = vote_count + 1 WHERE id = ? LIMIT 1;
-    UPDATE proposals SET vote_count = vote_count + 1, scores_total = scores_total + ?, scores_${item.choice} = scores_${item.choice} + ? WHERE id = ? LIMIT 1;
-    INSERT IGNORE INTO users SET ?;
-    UPDATE users SET vote_count = vote_count + 1 WHERE id = ? LIMIT 1;
-  `;
-  await mysql.queryAsync(query, [
-    item,
-    item.space,
-    item.vp,
-    item.vp,
-    `${item.space}/${item.proposal}`,
-    user,
-    voter
-  ]);
+  await prisma.user.upsert({
+    where: { id: user.id },
+    update: {},
+    create: user
+  });
+
+  await prisma.vote.create({
+    data: item
+  });
 }

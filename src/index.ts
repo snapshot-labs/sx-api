@@ -1,29 +1,48 @@
+import 'reflect-metadata';
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import fs from 'fs';
 import Checkpoint, { LogLevel } from '@snapshot-labs/checkpoint';
+import { buildSchema } from 'type-graphql';
+import { resolvers } from '@generated/type-graphql';
+import { graphqlHTTP } from 'express-graphql';
+import { PrismaClient } from '@prisma/client';
 import config from './config.json';
 import * as writer from './writer';
 
-const dir = __dirname.endsWith('dist/src') ? '../' : '';
-const schemaFile = path.join(__dirname, `${dir}../src/schema.gql`);
-const schema = fs.readFileSync(schemaFile, 'utf8');
+async function run() {
+  const prisma = new PrismaClient();
 
-// @ts-ignore
-const checkpoint = new Checkpoint(config, writer, schema, {
-  logLevel: LogLevel.Info,
-  prettifyLogs: process.env.NODE_ENV !== 'production'
-});
-checkpoint.reset().then(() => checkpoint.start());
+  // @ts-ignore
+  const checkpoint = new Checkpoint(config, writer, prisma, {
+    logLevel: LogLevel.Info,
+    prettifyLogs: process.env.NODE_ENV !== 'production'
+  });
+  checkpoint.start();
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+  // Does not work if built inside of checkpoint at the moment
+  const schema = await buildSchema({
+    resolvers,
+    validate: false
+  });
 
-app.use(express.json({ limit: '4mb' }));
-app.use(express.urlencoded({ limit: '4mb', extended: false }));
-app.use(cors({ maxAge: 86400 }));
-app.use('/', checkpoint.graphql);
+  const graphql = graphqlHTTP({
+    schema,
+    context: {
+      prisma
+    },
+    graphiql: true
+  });
 
-app.listen(PORT, () => console.log(`Listening at http://localhost:${PORT}`));
+  const app = express();
+  const PORT = process.env.PORT || 3000;
+
+  app.use(express.json({ limit: '4mb' }));
+  app.use(express.urlencoded({ limit: '4mb', extended: false }));
+  app.use(cors({ maxAge: 86400 }));
+  app.use('/', graphql);
+
+  app.listen(PORT, () => console.log(`Listening at http://localhost:${PORT}`));
+}
+
+run();

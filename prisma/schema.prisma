@@ -1,0 +1,95 @@
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:postgres@localhost:5432/checkpoint?schema=public"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator typegraphql {
+  provider = "typegraphql-prisma"
+}
+
+model Checkpoint {
+  id               String @id @db.VarChar(10)
+  block_number     BigInt
+  contract_address String @db.VarChar(66)
+}
+
+model Metadata {
+  id    String @id @db.VarChar(20)
+  value String @db.VarChar(128)
+}
+
+model Space {
+  id                 String     @id
+  name               String
+  about              String?
+  controller         String
+  voting_delay       BigInt
+  min_voting_period  BigInt
+  max_voting_period  BigInt
+  proposal_threshold BigInt
+  quorum             Float
+  strategies         String[]
+  strategies_params  String[]
+  authenticators     String[]
+  executors          String[]
+  proposal_count     Int
+  vote_count         Int
+  created            Int
+  tx                 String
+  proposals          Proposal[]
+  votes              Vote[]
+}
+
+model Proposal {
+  id                String   @id
+  proposal_id       Int
+  space_id          String
+  author_id         String
+  execution_hash    String
+  metadata_uri      String
+  title             String
+  body              String
+  discussion        String
+  execution         String
+  start             Int
+  end               Int
+  min_end           Int
+  max_end           Int
+  snapshot          Int
+  strategies        String[]
+  strategies_params String[]
+  scores_1          Float
+  scores_2          Float
+  scores_3          Float
+  scores_total      Float
+  created           Int
+  tx                String
+  vote_count        Int
+  space             Space    @relation(fields: [space_id], references: [id])
+  author            User     @relation(fields: [author_id], references: [id])
+}
+
+model Vote {
+  id       String @id
+  voter_id String
+  space_id String
+  proposal Int
+  choice   Int
+  vp       Float
+  created  Int
+  voter    User   @relation(fields: [voter_id], references: [id])
+  space    Space  @relation(fields: [space_id], references: [id])
+}
+
+model User {
+  id             String     @id
+  proposal_count Int
+  vote_count     Int
+  created        Int
+  proposals      Proposal[]
+  votes          Vote[]
+}
