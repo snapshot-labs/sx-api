@@ -18,6 +18,7 @@ function uint256toString(uint256) {
 
 export const handleSpaceCreated: CheckpointWriter = async ({
   block,
+  blockNumber,
   tx,
   event,
   mysql,
@@ -48,13 +49,13 @@ export const handleSpaceCreated: CheckpointWriter = async ({
     executors: JSON.stringify(event.execution_strategies),
     proposal_count: 0,
     vote_count: 0,
-    created: block.timestamp,
+    created: block?.timestamp ?? Date.now(),
     tx: tx.transaction_hash
   };
 
   try {
-    const metadataUri = shortStringArrToStr(event.metadata_uri).replaceAll('\x00', '');
-    const metadata: any = await getJSON(metadataUri);
+    const metadataUri = shortStringArrToStr(event.metadata_uri || []).replaceAll('\x00', '');
+    const metadata: any = metadataUri ? await getJSON(metadataUri) : {};
 
     if (metadata.name) item.name = metadata.name;
     if (metadata.description) item.about = metadata.description;
@@ -74,7 +75,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({
 
   instance.executeTemplate('Space', {
     contract: item.id,
-    start: block.block_number
+    start: blockNumber
   });
 
   const query = `INSERT IGNORE INTO spaces SET ?;`;
@@ -143,6 +144,8 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
   const timestamps = parseTimestamps(event.proposal.timestamps);
   if (!timestamps) return;
 
+  const created = block?.timestamp ?? Date.now();
+
   const item = {
     id: `${space}/${proposal}`,
     proposal_id: proposal,
@@ -165,7 +168,7 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     quorum: uint256toString(event.proposal.quorum),
     strategies,
     strategies_params,
-    created: block.timestamp,
+    created,
     tx: tx.transaction_hash,
     vote_count: 0
   };
@@ -175,7 +178,7 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     id: author,
     vote_count: 0,
     proposal_count: 0,
-    created: block.timestamp
+    created
   };
 
   const query = `
@@ -198,6 +201,8 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
   const choice = parseInt(BigInt(event.vote.choice).toString());
   const vp = parseFloat(formatUnits(uint256toString(event.vote.voting_power), 18));
 
+  const created = block?.timestamp ?? Date.now();
+
   const item = {
     id: `${space}/${proposal}/${voter}`,
     space,
@@ -205,7 +210,7 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
     voter,
     choice,
     vp,
-    created: block.timestamp
+    created
   };
   console.log('Vote', item);
 
@@ -213,7 +218,7 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
     id: voter,
     vote_count: 0,
     proposal_count: 0,
-    created: block.timestamp
+    created
   };
 
   const query = `
