@@ -6,6 +6,7 @@ import fs from 'fs';
 import Checkpoint, { LogLevel } from '@snapshot-labs/checkpoint';
 import config from './config.json';
 import * as writer from './writer';
+import SpaceFactory from './abis/SpaceFactory.json';
 
 const dir = __dirname.endsWith('dist/src') ? '../' : '';
 const schemaFile = path.join(__dirname, `${dir}../src/schema.gql`);
@@ -17,7 +18,10 @@ if (process.env.NETWORK_NODE_URL) {
 
 const checkpoint = new Checkpoint(config, writer, schema, {
   logLevel: LogLevel.Info,
-  prettifyLogs: process.env.NODE_ENV !== 'production'
+  prettifyLogs: process.env.NODE_ENV !== 'production',
+  abis: {
+    SpaceFactory
+  }
 });
 
 checkpoint.reset().then(() => checkpoint.start());
