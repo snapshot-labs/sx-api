@@ -15,16 +15,16 @@ function intSequenceToString(intSequence) {
 export const handleSpaceCreated: CheckpointWriter = async ({
   block,
   tx,
-  event,
+  rawEvent,
   mysql,
   instance
 }) => {
-  if (!event) return;
+  if (!rawEvent) return;
 
   console.log('Handle space created');
   const format =
     'deployer_address, space_address, voting_delay, min_voting_period, max_voting_period, proposal_threshold(uint256), controller, quorum(uint256), strategies_len, strategies(felt*), strategies_params_len, strategies_params(felt*), authenticators_len, authenticators(felt*), executors_len, executors(felt*)';
-  const data: any = getEvent(event.data, format);
+  const data: any = getEvent(rawEvent.data, format);
 
   const item = {
     id: validateAndParseAddress(data.space_address),
@@ -54,15 +54,15 @@ export const handleSpaceCreated: CheckpointWriter = async ({
   await mysql.queryAsync(query, [item]);
 };
 
-export const handlePropose: CheckpointWriter = async ({ block, tx, event, mysql }) => {
-  if (!event) return;
+export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, mysql }) => {
+  if (!rawEvent) return;
 
   console.log('Handle propose');
   const format =
     'proposal, author, quorum(uint256), timestamps, execution_strategy, execution_hash, metadata_uri_len, metadata_uri(felt*)';
-  const data: any = getEvent(event.data, format);
+  const data: any = getEvent(rawEvent.data, format);
 
-  const space = validateAndParseAddress(event.from_address);
+  const space = validateAndParseAddress(rawEvent.from_address);
   const [{ strategies, strategies_params }] = await mysql.queryAsync(
     'SELECT strategies, strategies_params FROM spaces WHERE id = ? LIMIT 1',
     [space]
@@ -135,14 +135,14 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, event, mysql 
   await mysql.queryAsync(query, [item, item.space, user, author]);
 };
 
-export const handleVote: CheckpointWriter = async ({ block, event, mysql }) => {
-  if (!event) return;
+export const handleVote: CheckpointWriter = async ({ block, rawEvent, mysql }) => {
+  if (!rawEvent) return;
 
   console.log('Handle vote');
   const format = 'proposal, voter, choice, vp';
-  const data: any = getEvent(event.data, format);
+  const data: any = getEvent(rawEvent.data, format);
 
-  const space = validateAndParseAddress(event.from_address);
+  const space = validateAndParseAddress(rawEvent.from_address);
   const proposal = parseInt(BigInt(data.proposal).toString());
   const voter = toAddress(data.voter);
   const choice = parseInt(BigInt(data.choice).toString());
