@@ -30,7 +30,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({
   const item = {
     id: validateAndParseAddress(event.space_address),
     name: getSpaceName(event.space_address),
-    description: '',
+    about: '',
     external_url: '',
     github_url: '',
     twitter_url: '',
@@ -57,7 +57,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({
     const metadata: any = await getJSON(metadataUri);
 
     if (metadata.name) item.name = metadata.name;
-    if (metadata.description) item.description = metadata.description;
+    if (metadata.description) item.about = metadata.description;
     if (metadata.external_url) item.external_url = metadata.external_url;
 
     if (metadata.properties) {
@@ -92,7 +92,7 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
     const metadataUri = shortStringArrToStr(event.new_metadata_uri).replaceAll('\x00', '');
     const metadata: any = await getJSON(metadataUri);
 
-    const query = `UPDATE spaces SET name = ?, description = ?, external_url = ?, github_url = ?, twitter_url = ?, discord_url = ?, treasury_address = ? WHERE id = ? LIMIT 1;`;
+    const query = `UPDATE spaces SET name = ?, about = ?, external_url = ?, github_url = ?, twitter_url = ?, discord_url = ?, treasury_address = ? WHERE id = ? LIMIT 1;`;
     await mysql.queryAsync(query, [
       metadata.name,
       metadata.description,

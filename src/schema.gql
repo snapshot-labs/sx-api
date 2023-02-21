@@ -4,7 +4,7 @@ scalar Text
 type Space {
   id: String!
   name: String
-  description: String
+  about: String
   external_url: String
   github_url: String
   twitter_url: String
