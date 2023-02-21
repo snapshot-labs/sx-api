@@ -30,7 +30,12 @@ export const handleSpaceCreated: CheckpointWriter = async ({
   const item = {
     id: validateAndParseAddress(event.space_address),
     name: getSpaceName(event.space_address),
-    about: null,
+    description: null,
+    external_url: null,
+    github_url: null,
+    twitter_url: null,
+    discord_url: null,
+    treasury_address: null,
     controller: validateAndParseAddress(event.controller),
     voting_delay: BigInt(event.voting_delay).toString(),
     min_voting_period: BigInt(event.min_voting_duration).toString(),
@@ -52,7 +57,17 @@ export const handleSpaceCreated: CheckpointWriter = async ({
     const metadata: any = await getJSON(metadataUri);
 
     if (metadata.name) item.name = metadata.name;
-    if (metadata.description) item.about = metadata.description;
+    if (metadata.description) item.description = metadata.description;
+    if (metadata.external_url) item.external_url = metadata.external_url;
+
+    if (metadata.properties) {
+      if (metadata.properties.github_url) item.github_url = metadata.properties.github_url;
+      if (metadata.properties.twitter_url) item.twitter_url = metadata.properties.twitter_url;
+      if (metadata.properties.discord_url) item.discord_url = metadata.properties.discord_url;
+      if (metadata.properties.treasury_address) {
+        item.treasury_address = metadata.properties.treasury_address;
+      }
+    }
   } catch (e) {
     console.log('failed to parse space metadata', e);
   }
@@ -77,11 +92,17 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
     const metadataUri = shortStringArrToStr(event.new_metadata_uri).replaceAll('\x00', '');
     const metadata: any = await getJSON(metadataUri);
 
-    const name = metadata.name || '';
-    const description = metadata.description || '';
-
-    const query = `UPDATE spaces SET name = ?, about = ? WHERE id = ? LIMIT 1;`;
-    await mysql.queryAsync(query, [name, description, space]);
+    const query = `UPDATE spaces SET name = ?, description = ?, external_url = ?, github_url = ?, twitter_url = ?, discord_url = ?, treasury_address = ? WHERE id = ? LIMIT 1;`;
+    await mysql.queryAsync(query, [
+      metadata.name,
+      metadata.description || null,
+      metadata.external_url || null,
+      metadata.properties?.github_url || null,
+      metadata.properties?.twitter_url || null,
+      metadata.properties?.discord_url || null,
+      metadata.properties?.treasury_address || null,
+      space
+    ]);
   } catch (e) {
     console.log('failed to update space metadata', e);
   }
