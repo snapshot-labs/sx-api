@@ -30,12 +30,12 @@ export const handleSpaceCreated: CheckpointWriter = async ({
   const item = {
     id: validateAndParseAddress(event.space_address),
     name: getSpaceName(event.space_address),
-    description: null,
-    external_url: null,
-    github_url: null,
-    twitter_url: null,
-    discord_url: null,
-    treasury_address: null,
+    description: '',
+    external_url: '',
+    github_url: '',
+    twitter_url: '',
+    discord_url: '',
+    treasury_address: '',
     controller: validateAndParseAddress(event.controller),
     voting_delay: BigInt(event.voting_delay).toString(),
     min_voting_period: BigInt(event.min_voting_duration).toString(),
@@ -95,12 +95,12 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
     const query = `UPDATE spaces SET name = ?, description = ?, external_url = ?, github_url = ?, twitter_url = ?, discord_url = ?, treasury_address = ? WHERE id = ? LIMIT 1;`;
     await mysql.queryAsync(query, [
       metadata.name,
-      metadata.description || null,
-      metadata.external_url || null,
-      metadata.properties?.github_url || null,
-      metadata.properties?.twitter_url || null,
-      metadata.properties?.discord_url || null,
-      metadata.properties?.treasury_address || null,
+      metadata.description,
+      metadata.external_url,
+      metadata.properties?.github_url,
+      metadata.properties?.twitter_url,
+      metadata.properties?.discord_url,
+      metadata.properties?.treasury_address,
       space
     ]);
   } catch (e) {
