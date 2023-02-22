@@ -6,10 +6,10 @@ type Space {
   name: String
   about: String
   external_url: String
-  github_url: String
-  twitter_url: String
-  discord_url: String
-  treasury_address: String
+  github: String
+  twitter: String
+  discord: String
+  wallet: String
   controller: String
   voting_delay: Int
   min_voting_period: Int

@@ -32,10 +32,10 @@ export const handleSpaceCreated: CheckpointWriter = async ({
     name: getSpaceName(event.space_address),
     about: '',
     external_url: '',
-    github_url: '',
-    twitter_url: '',
-    discord_url: '',
-    treasury_address: '',
+    github: '',
+    twitter: '',
+    discord: '',
+    wallet: '',
     controller: validateAndParseAddress(event.controller),
     voting_delay: BigInt(event.voting_delay).toString(),
     min_voting_period: BigInt(event.min_voting_duration).toString(),
@@ -61,11 +61,11 @@ export const handleSpaceCreated: CheckpointWriter = async ({
     if (metadata.external_url) item.external_url = metadata.external_url;
 
     if (metadata.properties) {
-      if (metadata.properties.github_url) item.github_url = metadata.properties.github_url;
-      if (metadata.properties.twitter_url) item.twitter_url = metadata.properties.twitter_url;
-      if (metadata.properties.discord_url) item.discord_url = metadata.properties.discord_url;
-      if (metadata.properties.treasury_address) {
-        item.treasury_address = metadata.properties.treasury_address;
+      if (metadata.properties.github) item.github = metadata.properties.github;
+      if (metadata.properties.twitter) item.twitter = metadata.properties.twitter;
+      if (metadata.properties.discord) item.discord = metadata.properties.discord;
+      if (metadata.properties.wallets && metadata.properties.wallets.length > 0) {
+        item.wallet = metadata.properties.wallets[0];
       }
     }
   } catch (e) {
@@ -92,15 +92,17 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
     const metadataUri = shortStringArrToStr(event.new_metadata_uri).replaceAll('\x00', '');
     const metadata: any = await getJSON(metadataUri);
 
-    const query = `UPDATE spaces SET name = ?, about = ?, external_url = ?, github_url = ?, twitter_url = ?, discord_url = ?, treasury_address = ? WHERE id = ? LIMIT 1;`;
+    const query = `UPDATE spaces SET name = ?, about = ?, external_url = ?, github = ?, twitter = ?, discord = ?, wallet = ? WHERE id = ? LIMIT 1;`;
     await mysql.queryAsync(query, [
       metadata.name,
       metadata.description,
       metadata.external_url,
-      metadata.properties?.github_url,
-      metadata.properties?.twitter_url,
-      metadata.properties?.discord_url,
-      metadata.properties?.treasury_address,
+      metadata.properties?.github,
+      metadata.properties?.twitter,
+      metadata.properties?.discord,
+      metadata.properties?.wallets && metadata.properties?.wallets.length > 0
+        ? metadata.properties?.wallets[0]
+        : '',
       space
     ]);
   } catch (e) {
