@@ -168,8 +168,8 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     scores_3: 0,
     scores_total: 0,
     quorum: uint256toString(event.proposal.quorum),
-    strategies,
-    strategies_params,
+    strategies: JSON.stringify(strategies),
+    strategies_params: JSON.stringify(strategies_params),
     created,
     tx: tx.transaction_hash,
     vote_count: 0
