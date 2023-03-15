@@ -21,7 +21,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({
   blockNumber,
   tx,
   event,
-  mysql,
+  knex,
   instance
 }) => {
   if (!event) return;
@@ -78,11 +78,10 @@ export const handleSpaceCreated: CheckpointWriter = async ({
     start: blockNumber
   });
 
-  const query = `INSERT IGNORE INTO spaces SET ?;`;
-  await mysql.queryAsync(query, [item]);
+  await knex.table('spaces').insert(item).onConflict().ignore();
 };
 
-export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, event, mysql }) => {
+export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, event, knex }) => {
   if (!event || !rawEvent) return;
 
   console.log('Handle space metadata uri updated');
@@ -93,34 +92,37 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
     const metadataUri = shortStringArrToStr(event.new_metadata_uri).replaceAll('\x00', '');
     const metadata: any = await getJSON(metadataUri);
 
-    const query = `UPDATE spaces SET name = ?, about = ?, external_url = ?, github = ?, twitter = ?, discord = ?, wallet = ? WHERE id = ? LIMIT 1;`;
-    await mysql.queryAsync(query, [
-      metadata.name,
-      metadata.description,
-      metadata.external_url,
-      metadata.properties?.github,
-      metadata.properties?.twitter,
-      metadata.properties?.discord,
-      metadata.properties?.wallets && metadata.properties?.wallets.length > 0
-        ? metadata.properties?.wallets[0]
-        : '',
-      space
-    ]);
+    await knex
+      .table('spaces')
+      .where('id', space)
+      .update({
+        name: metadata.name,
+        about: metadata.description,
+        external_url: metadata.external_url,
+        github: metadata.properties?.github,
+        twitter: metadata.properties?.twitter,
+        discord: metadata.properties?.discord,
+        wallet:
+          metadata.properties?.wallets && metadata.properties?.wallets.length > 0
+            ? metadata.properties?.wallets[0]
+            : ''
+      });
   } catch (e) {
     console.log('failed to update space metadata', e);
   }
 };
 
-export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, event, mysql }) => {
+export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, event, knex }) => {
   if (!rawEvent || !event) return;
 
   console.log('Handle propose');
 
   const space = validateAndParseAddress(rawEvent.from_address);
-  const [{ strategies, strategies_params }] = await mysql.queryAsync(
-    'SELECT strategies, strategies_params FROM spaces WHERE id = ? LIMIT 1',
-    [space]
-  );
+  const [{ strategies, strategies_params }] = await knex
+    .select('strategies', 'strategies_params')
+    .from('spaces')
+    .where('id', space)
+    .limit(1);
   const proposal = parseInt(BigInt(event.proposal_id).toString());
   const author = toAddress(event.proposer_address.value);
   let title = '';
@@ -181,16 +183,19 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     created
   };
 
-  const query = `
-    INSERT IGNORE INTO proposals SET ?;
-    UPDATE spaces SET proposal_count = proposal_count + 1 WHERE id = ? LIMIT 1;
-    INSERT IGNORE INTO users SET ?;
-    UPDATE users SET proposal_count = proposal_count + 1 WHERE id = ? LIMIT 1;
-  `;
-  await mysql.queryAsync(query, [item, item.space, user, author]);
+  await knex.table('proposals').insert(item).onConflict().ignore();
+  await knex
+    .table('spaces')
+    .where('id', item.space)
+    .update({ proposal_count: knex.raw('proposal_count + 1') });
+  await knex.table('users').insert(user).onConflict().ignore();
+  await knex
+    .table('users')
+    .where('id', author)
+    .update({ proposal_count: knex.raw('proposal_count + 1') });
 };
 
-export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mysql }) => {
+export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, knex }) => {
   if (!rawEvent || !event) return;
 
   console.log('Handle vote', event);
@@ -221,20 +226,22 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
     created
   };
 
-  const query = `
-    INSERT IGNORE INTO votes SET ?;
-    UPDATE spaces SET vote_count = vote_count + 1 WHERE id = ? LIMIT 1;
-    UPDATE proposals SET vote_count = vote_count + 1, scores_total = scores_total + ?, scores_${item.choice} = scores_${item.choice} + ? WHERE id = ? LIMIT 1;
-    INSERT IGNORE INTO users SET ?;
-    UPDATE users SET vote_count = vote_count + 1 WHERE id = ? LIMIT 1;
-  `;
-  await mysql.queryAsync(query, [
-    item,
-    item.space,
-    item.vp,
-    item.vp,
-    `${item.space}/${item.proposal}`,
-    user,
-    voter
-  ]);
+  await knex.table('votes').insert(item).onConflict().ignore();
+  await knex
+    .table('spaces')
+    .where('id', item.space)
+    .update({ vote_count: knex.raw('vote_count + 1') });
+  await knex
+    .table('proposals')
+    .where('id', `${item.space}/${item.proposal}`)
+    .update({
+      vote_count: knex.raw('vote_count + 1'),
+      scores_total: knex.raw('scores_total + ?', [item.vp]),
+      [`scores_${item.choice}`]: knex.raw('?? + ?', [`scores_${item.choice}`, item.vp])
+    });
+  await knex.table('users').insert(user).onConflict().ignore();
+  await knex
+    .table('users')
+    .where('id', voter)
+    .update({ vote_count: knex.raw('vote_count + 1') });
 };
