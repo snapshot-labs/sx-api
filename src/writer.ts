@@ -21,7 +21,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({
   blockNumber,
   tx,
   event,
-  mysql,
+  pg,
   instance
 }) => {
   if (!event) return;
@@ -78,11 +78,44 @@ export const handleSpaceCreated: CheckpointWriter = async ({
     start: blockNumber
   });
 
-  const query = `INSERT IGNORE INTO spaces SET ?;`;
-  await mysql.queryAsync(query, [item]);
+  const query = `
+    INSERT INTO spaces(
+      id, name, about, external_url, github, twitter, discord, wallet,
+      controller, voting_delay, min_voting_period, max_voting_period,
+      proposal_threshold, quorum, strategies, strategies_params,
+      authenticators, executors, proposal_count, vote_count, created, tx
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+      $17, $18, $19, $20, $21, $22
+    )
+    ON CONFLICT DO NOTHING;`;
+  await pg.query(query, [
+    item.id,
+    item.name,
+    item.about,
+    item.external_url,
+    item.github,
+    item.twitter,
+    item.discord,
+    item.wallet,
+    item.controller,
+    item.voting_delay,
+    item.min_voting_period,
+    item.max_voting_period,
+    item.proposal_threshold,
+    item.quorum,
+    item.strategies,
+    item.strategies_params,
+    item.authenticators,
+    item.executors,
+    item.proposal_count,
+    item.vote_count,
+    item.created,
+    item.tx
+  ]);
 };
 
-export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, event, mysql }) => {
+export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, event, pg }) => {
   if (!event || !rawEvent) return;
 
   console.log('Handle space metadata uri updated');
@@ -93,8 +126,8 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
     const metadataUri = shortStringArrToStr(event.new_metadata_uri).replaceAll('\x00', '');
     const metadata: any = await getJSON(metadataUri);
 
-    const query = `UPDATE spaces SET name = ?, about = ?, external_url = ?, github = ?, twitter = ?, discord = ?, wallet = ? WHERE id = ? LIMIT 1;`;
-    await mysql.queryAsync(query, [
+    const query = `UPDATE spaces SET name = $1, about = $2, external_url = $3, github = $4, twitter = $5, discord = $6, wallet = $7 WHERE id = $8;`;
+    await pg.query(query, [
       metadata.name,
       metadata.description,
       metadata.external_url,
@@ -111,16 +144,19 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
   }
 };
 
-export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, event, mysql }) => {
+export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, event, pg }) => {
   if (!rawEvent || !event) return;
 
   console.log('Handle propose');
 
   const space = validateAndParseAddress(rawEvent.from_address);
-  const [{ strategies, strategies_params }] = await mysql.queryAsync(
-    'SELECT strategies, strategies_params FROM spaces WHERE id = ? LIMIT 1',
+
+  const result = await pg.query(
+    'SELECT strategies, strategies_params FROM spaces WHERE id = $1 LIMIT 1',
     [space]
   );
+  const [{ strategies, strategies_params }] = result.rows;
+
   const proposal = parseInt(BigInt(event.proposal_id).toString());
   const author = toAddress(event.proposer_address.value);
   let title = '';
@@ -166,8 +202,8 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     scores_3: 0,
     scores_total: 0,
     quorum: uint256toString(event.proposal.quorum),
-    strategies,
-    strategies_params,
+    strategies: JSON.stringify(strategies),
+    strategies_params: JSON.stringify(strategies_params),
     created,
     tx: tx.transaction_hash,
     vote_count: 0
@@ -181,16 +217,59 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     created
   };
 
-  const query = `
-    INSERT IGNORE INTO proposals SET ?;
-    UPDATE spaces SET proposal_count = proposal_count + 1 WHERE id = ? LIMIT 1;
-    INSERT IGNORE INTO users SET ?;
-    UPDATE users SET proposal_count = proposal_count + 1 WHERE id = ? LIMIT 1;
-  `;
-  await mysql.queryAsync(query, [item, item.space, user, author]);
+  const insertProposalQuery = `
+      INSERT INTO proposals(
+        id, proposal_id, space, author, execution_hash, metadata_uri, title, body,
+        discussion, execution, start, min_end, max_end, snapshot, scores_1, scores_2,
+        scores_3, scores_total, quorum, strategies, strategies_params, created, tx,
+        vote_count
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+        $18, $19, $20, $21, $22, $23, $24
+      )`;
+  const insertUserQuery = `
+      INSERT INTO users(
+        id, vote_count, proposal_count, created
+      ) VALUES (
+        $1, $2, $3, $4
+      )`;
+  const updateSpaceQuery = `UPDATE spaces SET proposal_count = proposal_count + 1 WHERE id = $1`;
+  const updateUserQuery = `UPDATE users SET proposal_count = proposal_count + 1 WHERE id = $1`;
+
+  await Promise.all([
+    pg.query(insertProposalQuery, [
+      item.id,
+      item.proposal_id,
+      item.space,
+      item.author,
+      item.execution_hash,
+      item.metadata_uri,
+      item.title,
+      item.body,
+      item.discussion,
+      item.execution,
+      item.start,
+      item.min_end,
+      item.max_end,
+      item.snapshot,
+      item.scores_1,
+      item.scores_2,
+      item.scores_3,
+      item.scores_total,
+      item.quorum,
+      item.strategies,
+      item.strategies_params,
+      item.created,
+      item.tx,
+      item.vote_count
+    ]),
+    pg.query(insertUserQuery, [user.id, user.vote_count, user.proposal_count, user.created]),
+    pg.query(updateSpaceQuery, [item.space]),
+    pg.query(updateUserQuery, [item.author])
+  ]);
 };
 
-export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mysql }) => {
+export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, pg }) => {
   if (!rawEvent || !event) return;
 
   console.log('Handle vote', event);
@@ -221,20 +300,49 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
     created
   };
 
-  const query = `
-    INSERT IGNORE INTO votes SET ?;
-    UPDATE spaces SET vote_count = vote_count + 1 WHERE id = ? LIMIT 1;
-    UPDATE proposals SET vote_count = vote_count + 1, scores_total = scores_total + ?, scores_${item.choice} = scores_${item.choice} + ? WHERE id = ? LIMIT 1;
-    INSERT IGNORE INTO users SET ?;
-    UPDATE users SET vote_count = vote_count + 1 WHERE id = ? LIMIT 1;
-  `;
-  await mysql.queryAsync(query, [
-    item,
-    item.space,
-    item.vp,
-    item.vp,
-    `${item.space}/${item.proposal}`,
-    user,
-    voter
+  const scoreIncreases = {
+    1: choice === 1 ? vp : 0,
+    2: choice === 2 ? vp : 0,
+    3: choice === 3 ? vp : 0
+  };
+
+  const insertVoteQuery = `
+    INSERT INTO votes(
+      id, space, proposal, voter, choice, vp, created
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7
+    ) ON CONFLICT DO NOTHING`;
+  const insertUserQuery = `
+    INSERT INTO users(
+      id, vote_count, proposal_count, created
+    ) VALUES (
+      $1, $2, $3, $4
+    ) ON CONFLICT DO NOTHING`;
+  const updateSpaceQuery = `UPDATE spaces SET vote_count = vote_count + 1 WHERE id = $1`;
+  const updateProposalQuery = `
+    UPDATE proposals SET vote_count = vote_count + 1, scores_total = scores_total + $1,
+    scores_1 = scores_1 + $2, scores_2 = scores_2 + $3, scores_3 = scores_3 + $4 WHERE id = $5`;
+  const updateUserQuery = `UPDATE users SET vote_count = vote_count + 1 WHERE id = $1`;
+
+  await Promise.all([
+    pg.query(insertVoteQuery, [
+      item.id,
+      item.space,
+      item.proposal,
+      item.voter,
+      item.choice,
+      item.vp,
+      item.created
+    ]),
+    pg.query(insertUserQuery, [user.id, user.vote_count, user.proposal_count, user.created]),
+    pg.query(updateSpaceQuery, [item.space]),
+    pg.query(updateProposalQuery, [
+      item.vp,
+      scoreIncreases[1],
+      scoreIncreases[2],
+      scoreIncreases[3],
+      `${item.space}/${item.proposal}`
+    ]),
+    pg.query(updateUserQuery, [item.voter])
   ]);
 };

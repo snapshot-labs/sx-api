@@ -12,6 +12,17 @@ services:
       - MYSQL_DATABASE=checkpoint
     volumes:
       - mysql:/var/lib/mysql
+  postgres:
+    image: postgres:15.2
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_PASSWORD=default_password
+      - POSTGRES_DB=checkpoint
+    volumes:
+      - postgres:/var/lib/postgresql/data
 volumes:
   mysql:
+    driver: local
+  postgres:
     driver: local
