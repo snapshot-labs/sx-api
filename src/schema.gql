@@ -22,8 +22,8 @@ type Space {
   authenticators: [String]
   executors: [String]
   executors_types: [String]
-  proposal_count: Int
-  vote_count: Int
+  proposal_count: Int!
+  vote_count: Int!
   created: Int
   tx: String
   proposals: [Proposal]! @derivedFrom(field: "space")
@@ -46,14 +46,14 @@ type Proposal {
   snapshot: Int
   strategies: [String]
   strategies_params: [String]
-  scores_1: Float
-  scores_2: Float
-  scores_3: Float
-  scores_total: Float
+  scores_1: Float!
+  scores_2: Float!
+  scores_3: Float!
+  scores_total: Float!
   quorum: Float
   created: Int
   tx: String
-  vote_count: Int
+  vote_count: Int!
   executed: Boolean
 }
 
@@ -69,8 +69,8 @@ type Vote {
 
 type User {
   id: String!
-  proposal_count: Int
-  vote_count: Int
+  proposal_count: Int!
+  vote_count: Int!
   created: Int
   proposals: [Proposal]! @derivedFrom(field: "author")
   votes: [Vote]! @derivedFrom(field: "voter")
