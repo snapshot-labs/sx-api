@@ -4,7 +4,7 @@ dist
 build
 .env
 coverage
-codegen
+.checkpoint
 
 # Remove some common IDE working directories
 .idea

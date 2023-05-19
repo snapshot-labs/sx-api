@@ -2,7 +2,7 @@ import { formatUnits } from '@ethersproject/units';
 import { shortStringArrToStr } from '@snapshot-labs/sx/dist/utils/strings';
 import { validateAndParseAddress } from 'starknet';
 import { getJSON, toAddress, getSpaceName, parseTimestamps } from './utils';
-import { Space, Proposal, Vote, User } from '../codegen/models';
+import { Space, Proposal, Vote, User } from '../.checkpoint/models';
 import type { CheckpointWriter } from '@snapshot-labs/checkpoint';
 
 function intSequenceToString(intSequence) {
