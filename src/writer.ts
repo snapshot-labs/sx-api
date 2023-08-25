@@ -1,53 +1,69 @@
 import { formatUnits } from '@ethersproject/units';
-import { shortStringArrToStr } from '@snapshot-labs/sx/dist/utils/strings';
-import { validateAndParseAddress } from 'starknet';
-import { getJSON, toAddress, getSpaceName, parseTimestamps } from './utils';
+import { shortString, validateAndParseAddress } from 'starknet';
+import { getJSON, getSpaceName, parseTimestamps } from './utils';
 import type { CheckpointWriter } from '@snapshot-labs/checkpoint';
 
-function intSequenceToString(intSequence) {
-  const sequenceStr = shortStringArrToStr(intSequence);
-  return (sequenceStr.split(/(.{9})/) || [])
-    .filter(str => str !== '')
-    .map(str => str.replace('\x00', '').split('').reverse().join(''))
-    .join('');
+function longStringToText(array: string[]): string {
+  return array.reduce((acc, slice) => acc + shortString.decodeShortString(slice), '');
 }
 
-function uint256toString(uint256) {
-  return (BigInt(uint256.low) + (BigInt(uint256.high) << BigInt(128))).toString();
+function findVariant(value: { variant: Record<string, any> }) {
+  const result = Object.entries(value.variant).find(([, v]) => typeof v !== 'undefined');
+  if (!result) throw new Error('Invalid variant');
+
+  return {
+    key: result[0],
+    value: result[1]
+  };
 }
 
-export const handleSpaceCreated: CheckpointWriter = async ({
-  block,
-  blockNumber,
-  tx,
-  event,
-  mysql,
-  instance
-}) => {
+function getVoteValue(label: string) {
+  if (label === 'Against') return 0;
+  if (label === 'For') return 1;
+  if (label === 'Abstain') return 2;
+
+  throw new Error('Invalid vote label');
+}
+
+export const handleSpaceDeployed: CheckpointWriter = async ({ blockNumber, event, instance }) => {
+  console.log('Handle space deployed');
+
   if (!event) return;
 
+  await instance.executeTemplate('Space', {
+    contract: event.space_address,
+    start: blockNumber
+  });
+};
+
+export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, mysql }) => {
   console.log('Handle space created');
 
+  if (!event) return;
+
+  const strategies = event.voting_strategies.map(strategy => strategy.address);
+  const strategiesParams = event.voting_strategies.map(strategy => strategy.params.join(',')); // different format than sx-evm
+  const strategiesMetadataUris = event.voting_strategy_metadata_URIs.map(array =>
+    longStringToText(array)
+  );
+
   const item = {
-    id: validateAndParseAddress(event.space_address),
-    name: getSpaceName(event.space_address),
+    id: validateAndParseAddress(event.space),
+    name: getSpaceName(event.space),
     about: '',
     external_url: '',
     github: '',
     twitter: '',
     discord: '',
     wallet: '',
-    controller: validateAndParseAddress(event.controller),
+    controller: validateAndParseAddress(event.owner),
     voting_delay: BigInt(event.voting_delay).toString(),
     min_voting_period: BigInt(event.min_voting_duration).toString(),
     max_voting_period: BigInt(event.max_voting_duration).toString(),
-    proposal_threshold: uint256toString(event.proposal_threshold),
-    quorum: uint256toString(event.quorum),
-    strategies: JSON.stringify(event.voting_strategies),
-    strategies_params: JSON.stringify(event.voting_strategy_params_flat),
-    strategies_metadata: JSON.stringify([]),
+    strategies: JSON.stringify(strategies),
+    strategies_params: JSON.stringify(strategiesParams),
+    strategies_metadata: JSON.stringify(strategiesMetadataUris),
     authenticators: JSON.stringify(event.authenticators),
-    executors: JSON.stringify(event.execution_strategies),
     proposal_count: 0,
     vote_count: 0,
     created: block?.timestamp ?? Date.now(),
@@ -55,7 +71,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({
   };
 
   try {
-    const metadataUri = shortStringArrToStr(event.metadata_uri || []).replaceAll('\x00', '');
+    const metadataUri = longStringToText(event.metadata_URI || []).replaceAll('\x00', '');
     const metadata: any = metadataUri ? await getJSON(metadataUri) : {};
 
     if (metadata.name) item.name = metadata.name;
@@ -74,11 +90,6 @@ export const handleSpaceCreated: CheckpointWriter = async ({
     console.log('failed to parse space metadata', e);
   }
 
-  instance.executeTemplate('Space', {
-    contract: item.id,
-    start: blockNumber
-  });
-
   const query = `INSERT IGNORE INTO spaces SET ?;`;
   await mysql.queryAsync(query, [item]);
 };
@@ -91,7 +102,7 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
   const space = validateAndParseAddress(rawEvent.from_address);
 
   try {
-    const metadataUri = shortStringArrToStr(event.new_metadata_uri).replaceAll('\x00', '');
+    const metadataUri = longStringToText(event.metadata_URI).replaceAll('\x00', '');
     const metadata: any = await getJSON(metadataUri);
 
     const query = `UPDATE spaces SET name = ?, about = ?, external_url = ?, github = ?, twitter = ?, discord = ?, wallet = ? WHERE id = ? LIMIT 1;`;
@@ -123,7 +134,7 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     [space]
   );
   const proposal = parseInt(BigInt(event.proposal_id).toString());
-  const author = toAddress(event.proposer_address.value);
+  const author = findVariant(event.author).value;
   let title = '';
   let body = '';
   let discussion = '';
@@ -131,7 +142,7 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
   let metadataUri = '';
 
   try {
-    metadataUri = intSequenceToString(event.metadata_uri);
+    metadataUri = longStringToText(event.metadata_URI);
     const metadata: any = await getJSON(metadataUri);
     console.log('Metadata', metadata);
     if (metadata.title) title = metadata.title;
@@ -141,9 +152,6 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
   } catch (e) {
     console.log(JSON.stringify(e).slice(0, 256));
   }
-
-  const timestamps = parseTimestamps(event.proposal.timestamps);
-  if (!timestamps) return;
 
   const created = block?.timestamp ?? Date.now();
 
@@ -158,15 +166,15 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     body,
     discussion,
     execution,
-    start: parseInt(BigInt(timestamps.start).toString()),
-    min_end: parseInt(BigInt(timestamps.minEnd).toString()),
-    max_end: parseInt(BigInt(timestamps.maxEnd).toString()),
-    snapshot: parseInt(BigInt(timestamps.snapshot).toString()),
+    start: parseInt(BigInt(event.proposal.start_timestamp).toString()),
+    min_end: parseInt(BigInt(event.proposal.min_end_timestamp).toString()),
+    max_end: parseInt(BigInt(event.proposal.max_end_timestamp).toString()),
+    snapshot: parseInt(BigInt(event.proposal.start_timestamp).toString()),
     scores_1: 0,
     scores_2: 0,
     scores_3: 0,
     scores_total: 0,
-    quorum: uint256toString(event.proposal.quorum),
+    quorum: 0, // TODO: should come from execution strategy, how to get it in L1 execution?
     strategies,
     strategies_params,
     created,
@@ -194,13 +202,13 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
 export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mysql }) => {
   if (!rawEvent || !event) return;
 
-  console.log('Handle vote', event);
+  console.log('Handle vote');
 
   const space = validateAndParseAddress(rawEvent.from_address);
   const proposal = parseInt(event.proposal_id);
-  const voter = toAddress(event.voter_address.value);
-  const choice = parseInt(BigInt(event.vote.choice).toString());
-  const vp = parseFloat(formatUnits(uint256toString(event.vote.voting_power), 18));
+  const voter = findVariant(event.voter).value;
+  const choice = getVoteValue(findVariant(event.choice).key);
+  const vp = parseFloat(formatUnits(BigInt(event.voting_power), 18));
 
   const created = block?.timestamp ?? Date.now();
 
