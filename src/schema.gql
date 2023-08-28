@@ -53,6 +53,7 @@ type Proposal {
   scores_total: Float
   quorum: Float
   created: Int
+  edited: Int
   tx: String
   vote_count: Int
   executed: Boolean

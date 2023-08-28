@@ -252,6 +252,33 @@ export const handleCancel: CheckpointWriter = async ({ rawEvent, event, mysql })
   await mysql.queryAsync(query, [proposalId, vote_count, space]);
 };
 
+export const handleUpdate: CheckpointWriter = async ({ block, rawEvent, event, mysql }) => {
+  if (!rawEvent || !event) return;
+
+  console.log('Handle update');
+
+  const space = validateAndParseAddress(rawEvent.from_address);
+  const proposalId = `${space}/${parseInt(event.proposal_id)}`;
+  const metadataUri = longStringToText(event.metadata_URI);
+
+  try {
+    const metadata: any = await getJSON(metadataUri);
+
+    const query = `UPDATE proposals SET metadata_uri = ?, title = ?, body = ?, discussion = ?, execution = ?, edited = ? WHERE id = ? LIMIT 1;`;
+    await mysql.queryAsync(query, [
+      metadataUri,
+      metadata.title,
+      metadata.body,
+      metadata.discussion,
+      JSON.stringify(metadata.execution),
+      block?.timestamp ?? Date.now(),
+      proposalId
+    ]);
+  } catch (e) {
+    console.log('failed to update proposal metadata', e);
+  }
+};
+
 export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mysql }) => {
   if (!rawEvent || !event) return;
 
