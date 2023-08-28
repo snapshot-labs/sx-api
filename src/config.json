@@ -26,6 +26,10 @@
           "fn": "handlePropose"
         },
         {
+          "name": "ProposalCancelled",
+          "fn": "handleCancel"
+        },
+        {
           "name": "VoteCast",
           "fn": "handleVote"
         },

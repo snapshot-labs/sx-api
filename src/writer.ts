@@ -231,6 +231,27 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
   await mysql.queryAsync(query, [item, item.space, user, author]);
 };
 
+export const handleCancel: CheckpointWriter = async ({ rawEvent, event, mysql }) => {
+  if (!rawEvent || !event) return;
+
+  console.log('Handle cancel');
+
+  const space = validateAndParseAddress(rawEvent.from_address);
+  const proposalId = `${space}/${parseInt(event.proposal_id)}`;
+
+  const [{ vote_count }] = await mysql.queryAsync(
+    `SELECT vote_count FROM proposals WHERE id = ? LIMIT 1`,
+    [proposalId]
+  );
+
+  const query = `
+    UPDATE proposals SET cancelled = true WHERE id = ? LIMIT 1;
+    UPDATE spaces SET proposal_count = proposal_count - 1, vote_count = vote_count - ? WHERE id = ? LIMIT 1;
+  `;
+
+  await mysql.queryAsync(query, [proposalId, vote_count, space]);
+};
+
 export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mysql }) => {
   if (!rawEvent || !event) return;
 
