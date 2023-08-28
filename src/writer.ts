@@ -1,7 +1,13 @@
 import { formatUnits } from '@ethersproject/units';
-import { shortString, validateAndParseAddress } from 'starknet';
-import { getJSON, getSpaceName, parseTimestamps } from './utils';
+import { CallData, shortString, validateAndParseAddress } from 'starknet';
+import { utils } from '@snapshot-labs/sx';
+import EncodersAbi from './abis/encoders.json';
+import { getJSON, getSpaceName } from './utils';
 import type { CheckpointWriter } from '@snapshot-labs/checkpoint';
+
+const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
+  '0x190706f7d2e7ad757b9fda6867c9de43f13d6012832b922c7db8d2a509b2358';
+const encodersAbi = new CallData(EncodersAbi);
 
 function longStringToText(array: string[]): string {
   return array.reduce((acc, slice) => acc + shortString.decodeShortString(slice), '');
@@ -60,16 +66,42 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, m
     voting_delay: BigInt(event.voting_delay).toString(),
     min_voting_period: BigInt(event.min_voting_duration).toString(),
     max_voting_period: BigInt(event.max_voting_duration).toString(),
+    proposal_threshold: 0, // TODO: read from proposal validation
     strategies: JSON.stringify(strategies),
     strategies_params: JSON.stringify(strategiesParams),
     strategies_metadata: JSON.stringify(strategiesMetadataUris),
     authenticators: JSON.stringify(event.authenticators),
+    validation_strategy: event.proposal_validation_strategy.address,
+    validation_strategy_params: event.proposal_validation_strategy.params.join(','),
+    voting_power_validation_strategy_strategies: JSON.stringify([]),
+    voting_power_validation_strategy_strategies_params: JSON.stringify([]),
     proposal_count: 0,
     vote_count: 0,
     created: block?.timestamp ?? Date.now(),
     tx: tx.transaction_hash
   };
 
+  if (
+    utils.encoding.hexPadLeft(event.proposal_validation_strategy.address) ===
+    utils.encoding.hexPadLeft(PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY)
+  ) {
+    const parsed = encodersAbi.parse(
+      'proposition_power_params',
+      event.proposal_validation_strategy.params
+    ) as Record<string, any>;
+
+    if (Object.keys(parsed).length !== 0) {
+      item.proposal_threshold = parsed.proposal_threshold;
+      item.voting_power_validation_strategy_strategies = JSON.stringify(
+        parsed.allowed_strategies.map(strategy => `0x${strategy.address.toString(16)}`)
+      );
+      item.voting_power_validation_strategy_strategies_params = JSON.stringify(
+        parsed.allowed_strategies.map(strategy =>
+          strategy.params.map(param => `0x${param.toString(16)}`).join(',')
+        )
+      );
+    }
+  }
   try {
     const metadataUri = longStringToText(event.metadata_URI || []).replaceAll('\x00', '');
     const metadata: any = metadataUri ? await getJSON(metadataUri) : {};
