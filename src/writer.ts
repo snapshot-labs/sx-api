@@ -3,7 +3,7 @@ import { CallData, shortString, validateAndParseAddress } from 'starknet';
 import { utils } from '@snapshot-labs/sx';
 import EncodersAbi from './abis/encoders.json';
 import { getJSON, getSpaceName } from './utils';
-import type { CheckpointWriter } from '@snapshot-labs/checkpoint';
+import type { AsyncMySqlPool, CheckpointWriter } from '@snapshot-labs/checkpoint';
 
 const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
   '0x190706f7d2e7ad757b9fda6867c9de43f13d6012832b922c7db8d2a509b2358';
@@ -55,13 +55,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, m
 
   const item = {
     id: validateAndParseAddress(event.space),
-    name: getSpaceName(event.space),
-    about: '',
-    external_url: '',
-    github: '',
-    twitter: '',
-    discord: '',
-    wallet: '',
+    metadata: null as string | null,
     controller: validateAndParseAddress(event.owner),
     voting_delay: BigInt(event.voting_delay).toString(),
     min_voting_period: BigInt(event.min_voting_duration).toString(),
@@ -104,20 +98,9 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, m
   }
   try {
     const metadataUri = longStringToText(event.metadata_URI || []).replaceAll('\x00', '');
-    const metadata: any = metadataUri ? await getJSON(metadataUri) : {};
+    await handleSpaceMetadata(item.id, metadataUri, mysql);
 
-    if (metadata.name) item.name = metadata.name;
-    if (metadata.description) item.about = metadata.description;
-    if (metadata.external_url) item.external_url = metadata.external_url;
-
-    if (metadata.properties) {
-      if (metadata.properties.github) item.github = metadata.properties.github;
-      if (metadata.properties.twitter) item.twitter = metadata.properties.twitter;
-      if (metadata.properties.discord) item.discord = metadata.properties.discord;
-      if (metadata.properties.wallets && metadata.properties.wallets.length > 0) {
-        item.wallet = metadata.properties.wallets[0];
-      }
-    }
+    item.metadata = metadataUri;
   } catch (e) {
     console.log('failed to parse space metadata', e);
   }
@@ -135,21 +118,10 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
 
   try {
     const metadataUri = longStringToText(event.metadata_URI).replaceAll('\x00', '');
-    const metadata: any = await getJSON(metadataUri);
+    await handleSpaceMetadata(space, metadataUri, mysql);
 
-    const query = `UPDATE spaces SET name = ?, about = ?, external_url = ?, github = ?, twitter = ?, discord = ?, wallet = ? WHERE id = ? LIMIT 1;`;
-    await mysql.queryAsync(query, [
-      metadata.name,
-      metadata.description,
-      metadata.external_url,
-      metadata.properties?.github,
-      metadata.properties?.twitter,
-      metadata.properties?.discord,
-      metadata.properties?.wallets && metadata.properties?.wallets.length > 0
-        ? metadata.properties?.wallets[0]
-        : '',
-      space
-    ]);
+    const query = `UPDATE spaces SET metadata = ? WHERE id = ? LIMIT 1;`;
+    await mysql.queryAsync(query, [metadataUri, space]);
   } catch (e) {
     console.log('failed to update space metadata', e);
   }
@@ -167,23 +139,6 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
   );
   const proposal = parseInt(BigInt(event.proposal_id).toString());
   const author = findVariant(event.author).value;
-  let title = '';
-  let body = '';
-  let discussion = '';
-  let execution = '';
-  let metadataUri = '';
-
-  try {
-    metadataUri = longStringToText(event.metadata_URI);
-    const metadata: any = await getJSON(metadataUri);
-    console.log('Metadata', metadata);
-    if (metadata.title) title = metadata.title;
-    if (metadata.body) body = metadata.body;
-    if (metadata.discussion) discussion = metadata.discussion;
-    if (metadata.execution) execution = JSON.stringify(metadata.execution);
-  } catch (e) {
-    console.log(JSON.stringify(e).slice(0, 256));
-  }
 
   const created = block?.timestamp ?? Date.now();
 
@@ -192,12 +147,8 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     proposal_id: proposal,
     space,
     author,
+    metadata: null as string | null,
     execution_hash: event.proposal.execution_hash,
-    metadata_uri: metadataUri,
-    title,
-    body,
-    discussion,
-    execution,
     start: parseInt(BigInt(event.proposal.start_timestamp).toString()),
     min_end: parseInt(BigInt(event.proposal.min_end_timestamp).toString()),
     max_end: parseInt(BigInt(event.proposal.max_end_timestamp).toString()),
@@ -213,6 +164,16 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     tx: tx.transaction_hash,
     vote_count: 0
   };
+
+  try {
+    const metadataUri = longStringToText(event.metadata_URI);
+    await handleProposalMetadata(metadataUri, mysql);
+
+    item.metadata = metadataUri;
+  } catch (e) {
+    console.log(JSON.stringify(e).slice(0, 256));
+  }
+
   console.log('Proposal', item);
 
   const user = {
@@ -262,18 +223,10 @@ export const handleUpdate: CheckpointWriter = async ({ block, rawEvent, event, m
   const metadataUri = longStringToText(event.metadata_URI);
 
   try {
-    const metadata: any = await getJSON(metadataUri);
+    await handleProposalMetadata(metadataUri, mysql);
 
-    const query = `UPDATE proposals SET metadata_uri = ?, title = ?, body = ?, discussion = ?, execution = ?, edited = ? WHERE id = ? LIMIT 1;`;
-    await mysql.queryAsync(query, [
-      metadataUri,
-      metadata.title,
-      metadata.body,
-      metadata.discussion,
-      JSON.stringify(metadata.execution),
-      block?.timestamp ?? Date.now(),
-      proposalId
-    ]);
+    const query = `UPDATE proposals SET metadata = ?, edited = ? WHERE id = ? LIMIT 1;`;
+    await mysql.queryAsync(query, [metadataUri, block?.timestamp ?? Date.now(), proposalId]);
   } catch (e) {
     console.log('failed to update proposal metadata', e);
   }
@@ -327,3 +280,53 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
     voter
   ]);
 };
+
+async function handleSpaceMetadata(space: string, metadataUri: string, mysql: AsyncMySqlPool) {
+  const metadataItem = {
+    id: metadataUri,
+    name: getSpaceName(space),
+    about: '',
+    external_url: '',
+    github: '',
+    twitter: '',
+    discord: '',
+    wallet: ''
+  };
+
+  const metadata: any = metadataUri ? await getJSON(metadataUri) : {};
+
+  if (metadata.name) metadataItem.name = metadata.name;
+  if (metadata.description) metadataItem.about = metadata.description;
+  if (metadata.external_url) metadataItem.external_url = metadata.external_url;
+
+  if (metadata.properties) {
+    if (metadata.properties.github) metadataItem.github = metadata.properties.github;
+    if (metadata.properties.twitter) metadataItem.twitter = metadata.properties.twitter;
+    if (metadata.properties.discord) metadataItem.discord = metadata.properties.discord;
+    if (metadata.properties.wallets && metadata.properties.wallets.length > 0) {
+      metadataItem.wallet = metadata.properties.wallets[0];
+    }
+  }
+
+  const query = `INSERT IGNORE INTO spacemetadataitems SET ?;`;
+  await mysql.queryAsync(query, [metadataItem]);
+}
+
+async function handleProposalMetadata(metadataUri: string, mysql: AsyncMySqlPool) {
+  const metadataItem = {
+    id: metadataUri,
+    title: '',
+    body: '',
+    discussion: '',
+    execution: ''
+  };
+
+  const metadata: any = await getJSON(metadataUri);
+  if (metadata.title) metadataItem.title = metadata.title;
+  if (metadata.body) metadataItem.body = metadata.body;
+  if (metadata.discussion) metadataItem.discussion = metadata.discussion;
+  if (metadata.execution) metadataItem.execution = JSON.stringify(metadata.execution);
+
+  const query = `INSERT IGNORE INTO proposalmetadataitems SET ?;`;
+  await mysql.queryAsync(query, [metadataItem]);
+}

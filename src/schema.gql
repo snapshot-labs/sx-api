@@ -3,13 +3,7 @@ scalar Text
 
 type Space {
   id: String!
-  name: String
-  about: String
-  external_url: String
-  github: String
-  twitter: String
-  discord: String
-  wallet: String
+  metadata: SpaceMetadataItem
   controller: String
   voting_delay: Int
   min_voting_period: Int
@@ -30,17 +24,24 @@ type Space {
   proposals: [Proposal]! @derivedFrom(field: "space")
 }
 
+type SpaceMetadataItem {
+  id: String!
+  name: String
+  about: String
+  external_url: String
+  github: String
+  twitter: String
+  discord: String
+  wallet: String
+}
+
 type Proposal {
   id: String!
   proposal_id: Int
   space: Space
   author: User
   execution_hash: String
-  metadata_uri: String
-  title: Text
-  body: Text
-  discussion: Text
-  execution: Text
+  metadata: ProposalMetadataItem
   start: Int
   min_end: Int
   max_end: Int
@@ -58,6 +59,14 @@ type Proposal {
   vote_count: Int
   executed: Boolean
   cancelled: Boolean!
+}
+
+type ProposalMetadataItem {
+  id: String!
+  title: Text
+  body: Text
+  discussion: Text
+  execution: Text
 }
 
 type Vote {
