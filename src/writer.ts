@@ -9,6 +9,10 @@ const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
   '0x190706f7d2e7ad757b9fda6867c9de43f13d6012832b922c7db8d2a509b2358';
 const encodersAbi = new CallData(EncodersAbi);
 
+function dropIpfs(metadataUri: string) {
+  return metadataUri.replace('ipfs://', '');
+}
+
 function longStringToText(array: string[]): string {
   return array.reduce((acc, slice) => acc + shortString.decodeShortString(slice), '');
 }
@@ -100,7 +104,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, m
     const metadataUri = longStringToText(event.metadata_URI || []).replaceAll('\x00', '');
     await handleSpaceMetadata(item.id, metadataUri, mysql);
 
-    item.metadata = metadataUri;
+    item.metadata = dropIpfs(metadataUri);
   } catch (e) {
     console.log('failed to parse space metadata', e);
   }
@@ -121,7 +125,7 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
     await handleSpaceMetadata(space, metadataUri, mysql);
 
     const query = `UPDATE spaces SET metadata = ? WHERE id = ? LIMIT 1;`;
-    await mysql.queryAsync(query, [metadataUri, space]);
+    await mysql.queryAsync(query, [dropIpfs(metadataUri), space]);
   } catch (e) {
     console.log('failed to update space metadata', e);
   }
@@ -169,7 +173,7 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     const metadataUri = longStringToText(event.metadata_URI);
     await handleProposalMetadata(metadataUri, mysql);
 
-    item.metadata = metadataUri;
+    item.metadata = dropIpfs(metadataUri);
   } catch (e) {
     console.log(JSON.stringify(e).slice(0, 256));
   }
@@ -226,7 +230,11 @@ export const handleUpdate: CheckpointWriter = async ({ block, rawEvent, event, m
     await handleProposalMetadata(metadataUri, mysql);
 
     const query = `UPDATE proposals SET metadata = ?, edited = ? WHERE id = ? LIMIT 1;`;
-    await mysql.queryAsync(query, [metadataUri, block?.timestamp ?? Date.now(), proposalId]);
+    await mysql.queryAsync(query, [
+      dropIpfs(metadataUri),
+      block?.timestamp ?? Date.now(),
+      proposalId
+    ]);
   } catch (e) {
     console.log('failed to update proposal metadata', e);
   }
@@ -283,7 +291,7 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
 
 async function handleSpaceMetadata(space: string, metadataUri: string, mysql: AsyncMySqlPool) {
   const metadataItem = {
-    id: metadataUri,
+    id: dropIpfs(metadataUri),
     name: getSpaceName(space),
     about: '',
     avatar: '',
@@ -331,7 +339,7 @@ async function handleSpaceMetadata(space: string, metadataUri: string, mysql: As
 
 async function handleProposalMetadata(metadataUri: string, mysql: AsyncMySqlPool) {
   const metadataItem = {
-    id: metadataUri,
+    id: dropIpfs(metadataUri),
     title: '',
     body: '',
     discussion: '',
