@@ -286,10 +286,15 @@ async function handleSpaceMetadata(space: string, metadataUri: string, mysql: As
     id: metadataUri,
     name: getSpaceName(space),
     about: '',
+    avatar: '',
+    cover: '',
     external_url: '',
+    delegation_api_type: '',
+    delegation_api_url: '',
     github: '',
     twitter: '',
     discord: '',
+    voting_power_symbol: '',
     wallet: ''
   };
 
@@ -297,12 +302,24 @@ async function handleSpaceMetadata(space: string, metadataUri: string, mysql: As
 
   if (metadata.name) metadataItem.name = metadata.name;
   if (metadata.description) metadataItem.about = metadata.description;
+  if (metadata.avatar) metadataItem.avatar = metadata.avatar;
   if (metadata.external_url) metadataItem.external_url = metadata.external_url;
 
   if (metadata.properties) {
+    if (metadata.properties.cover) metadataItem.cover = metadata.properties.cover;
+    if (
+      metadata.properties.delegation_api_type === 'governor-subgraph' &&
+      metadata.properties.delegation_api_url
+    ) {
+      metadataItem.delegation_api_type = metadata.properties.delegation_api_type;
+      metadataItem.delegation_api_url = metadata.properties.delegation_api_url;
+    }
     if (metadata.properties.github) metadataItem.github = metadata.properties.github;
     if (metadata.properties.twitter) metadataItem.twitter = metadata.properties.twitter;
     if (metadata.properties.discord) metadataItem.discord = metadata.properties.discord;
+    if (metadata.properties.voting_power_symbol) {
+      metadataItem.voting_power_symbol = metadata.properties.voting_power_symbol;
+    }
     if (metadata.properties.wallets && metadata.properties.wallets.length > 0) {
       metadataItem.wallet = metadata.properties.wallets[0];
     }

@@ -28,10 +28,15 @@ type SpaceMetadataItem {
   id: String!
   name: String
   about: String
+  avatar: String
+  cover: String
   external_url: String
+  delegation_api_type: String
+  delegation_api_url: String
   github: String
   twitter: String
   discord: String
+  voting_power_symbol: String
   wallet: String
 }
 
