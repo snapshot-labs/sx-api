@@ -1217,10 +1217,10 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
-"@snapshot-labs/checkpoint@^0.1.0-beta.17":
-  version "0.1.0-beta.17"
-  resolved "https://registry.yarnpkg.com/@snapshot-labs/checkpoint/-/checkpoint-0.1.0-beta.17.tgz#fdc0fdc1c7f5c602a5044d657eb4f96562d91211"
-  integrity sha512-ryObjuQ7jxqFD1CY8k5iPu8EHhlbt4dt5o+F4QRvUfzftNcs5Yc0teQJHev8SH29SBimptb4pnDUb2wM3iihOA==
+"@snapshot-labs/checkpoint@^0.1.0-beta.19":
+  version "0.1.0-beta.19"
+  resolved "https://registry.yarnpkg.com/@snapshot-labs/checkpoint/-/checkpoint-0.1.0-beta.19.tgz#319aad2d192956342d41942060cd2db88ec0a472"
+  integrity sha512-PdqAJA48Yp4SsEz7iDBr7ACA91z67xiBkJGP9GNbKvgK9VjcmySconTLgzSh2F9FhEwC8DHq17BT2X6RAw5TsA==
   dependencies:
     "@graphql-tools/schema" "^8.5.1"
     bluebird "^3.7.2"
@@ -1233,11 +1233,14 @@
     json-to-graphql-query "^2.2.4"
     knex "^2.4.2"
     mysql "^2.18.1"
+    object-hash "^3.0.0"
     pg "^8.10.0"
     pino "^8.3.1"
     pino-pretty "^8.1.0"
     pluralize "^8.0.0"
     starknet "^4.13.1"
+    yargs "^17.7.2"
+    zod "^3.21.4"
 
 "@snapshot-labs/eslint-config-base@^0.1.0-beta.7":
   version "0.1.0-beta.7"
@@ -4076,6 +4079,11 @@ object-assign@^4:
   resolved "https://registry.yarnpkg.com/object-assign/-/object-assign-4.1.1.tgz#2109adc7965887cfc05cbbd442cac8bfbb360863"
   integrity sha1-IQmtx5ZYh8/AXLvUQsrIv7s2CGM=
 
+object-hash@^3.0.0:
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/object-hash/-/object-hash-3.0.0.tgz#73f97f753e7baffc0e2cc9d6e079079744ac82e9"
+  integrity sha512-RSn9F68PjH9HqtltsSnqYC1XXoWe9Bju5+213R98cNGttag9q9yAOTzdbsqvIa7aNm5WffBZFpWYr2aWrklWAw==
+
 object-inspect@^1.9.0:
   version "1.12.0"
   resolved "https://registry.yarnpkg.com/object-inspect/-/object-inspect-1.12.0.tgz#6e2c120e868fd1fd18cb4f18c31741d0d6e776f0"
@@ -5483,3 +5491,8 @@ yocto-queue@^0.1.0:
   version "0.1.0"
   resolved "https://registry.yarnpkg.com/yocto-queue/-/yocto-queue-0.1.0.tgz#0294eb3dee05028d31ee1a5fa2c556a6aaf10a1b"
   integrity sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==
+
+zod@^3.21.4:
+  version "3.22.2"
+  resolved "https://registry.yarnpkg.com/zod/-/zod-3.22.2.tgz#3add8c682b7077c05ac6f979fea6998b573e157b"
+  integrity sha512-wvWkphh5WQsJbVk1tbx1l1Ly4yg+XecD+Mq280uBGt9wa5BKSWf4Mhp6GmrkPixhMxmabYY7RbzlwVP32pbGCg==
