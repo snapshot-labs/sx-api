@@ -51,6 +51,11 @@ type Proposal {
   min_end: Int
   max_end: Int
   snapshot: Int
+  execution_time: Int!
+  execution_strategy: String!
+  execution_strategy_type: String!
+  timelock_veto_guardian: String
+  timelock_delay: Int
   strategies: [String]
   strategies_params: [String]
   scores_1: Float
@@ -61,8 +66,12 @@ type Proposal {
   created: Int
   edited: Int
   tx: String
+  execution_tx: String
+  veto_tx: String
   vote_count: Int
-  executed: Boolean
+  executed: Boolean!
+  vetoed: Boolean!
+  completed: Boolean!
   cancelled: Boolean!
 }
 

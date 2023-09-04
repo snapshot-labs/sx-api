@@ -2,7 +2,7 @@
   "network_node_url": "http://127.0.0.1:5050/rpc",
   "sources": [
     {
-      "contract": "0x2d75f8539619958685059f91c4c11734f554acd56228b12991f1ed23f0e27d5",
+      "contract": "0x2de452740896a0eb49b23aaeb5b188fc8e444ce9e17f6318127daf6127efefc",
       "start": 1,
       "abi": "SpaceFactory",
       "events": [
@@ -32,6 +32,10 @@
         {
           "name": "ProposalUpdated",
           "fn": "handleUpdate"
+        },
+        {
+          "name": "ProposalExecuted",
+          "fn": "handleExecute"
         },
         {
           "name": "VoteCast",

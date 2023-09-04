@@ -1,13 +1,26 @@
 import { formatUnits } from '@ethersproject/units';
-import { CallData, shortString, validateAndParseAddress } from 'starknet';
+import { Contract as EthContract } from '@ethersproject/contracts';
+import { JsonRpcProvider } from '@ethersproject/providers';
+import { Contract, CallData, Provider, shortString, validateAndParseAddress } from 'starknet';
 import { utils } from '@snapshot-labs/sx';
 import EncodersAbi from './abis/encoders.json';
+import ExecutionStrategyAbi from './abis/executionStrategy.json';
+import SimpleQuorumExecutionStrategyAbi from './abis/l1/SimpleQuorumExecutionStrategy.json';
 import { getJSON, getSpaceName } from './utils';
-import type { AsyncMySqlPool, CheckpointWriter } from '@snapshot-labs/checkpoint';
+import Config from './config.json';
+import type { AsyncMySqlPool, CheckpointWriter, ParsedEvent } from '@snapshot-labs/checkpoint';
 
 const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
-  '0x190706f7d2e7ad757b9fda6867c9de43f13d6012832b922c7db8d2a509b2358';
+  '0x4f00d2ef6b6c0e0de21fe1034176bf1f094fa2d7edd75348653cfef3440494a';
 const encodersAbi = new CallData(EncodersAbi);
+
+const ethProvider = new JsonRpcProvider('http://127.0.0.1:8545');
+
+const starkProvider = new Provider({
+  rpc: {
+    nodeUrl: Config.network_node_url
+  }
+});
 
 function dropIpfs(metadataUri: string) {
   return metadataUri.replace('ipfs://', '');
@@ -64,7 +77,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, m
     voting_delay: BigInt(event.voting_delay).toString(),
     min_voting_period: BigInt(event.min_voting_duration).toString(),
     max_voting_period: BigInt(event.max_voting_duration).toString(),
-    proposal_threshold: 0, // TODO: read from proposal validation
+    proposal_threshold: 0,
     strategies: JSON.stringify(strategies),
     strategies_params: JSON.stringify(strategiesParams),
     strategies_metadata: JSON.stringify(strategiesMetadataUris),
@@ -157,17 +170,35 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
     min_end: parseInt(BigInt(event.proposal.min_end_timestamp).toString()),
     max_end: parseInt(BigInt(event.proposal.max_end_timestamp).toString()),
     snapshot: parseInt(BigInt(event.proposal.start_timestamp).toString()),
+    execution_time: 0,
+    execution_strategy: validateAndParseAddress(event.proposal.execution_strategy),
+    execution_strategy_type: 'none',
     scores_1: 0,
     scores_2: 0,
     scores_3: 0,
     scores_total: 0,
-    quorum: 0, // TODO: should come from execution strategy, how to get it in L1 execution?
+    quorum: 0n,
     strategies,
     strategies_params,
     created,
     tx: tx.transaction_hash,
-    vote_count: 0
+    execution_tx: null,
+    veto_tx: null,
+    vote_count: 0,
+    executed: false,
+    vetoed: false,
+    completed: false,
+    cancelled: false
   };
+
+  const executionStrategy = await handleExecutionStrategy(
+    event.proposal.execution_strategy,
+    event.payload
+  );
+  if (executionStrategy) {
+    item.execution_strategy_type = executionStrategy.executionStrategyType;
+    item.quorum = executionStrategy.quorum;
+  }
 
   try {
     const metadataUri = longStringToText(event.metadata_URI);
@@ -238,6 +269,31 @@ export const handleUpdate: CheckpointWriter = async ({ block, rawEvent, event, m
   } catch (e) {
     console.log('failed to update proposal metadata', e);
   }
+
+  const executionStrategy = await handleExecutionStrategy(
+    event.proposal.execution_strategy,
+    event.payload
+  );
+  if (executionStrategy) {
+    const query = `UPDATE proposals SET execution_strategy_type = ?, quorum = ? WHERE id = ? LIMIT 1;`;
+    await mysql.queryAsync(query, [
+      executionStrategy.executionStrategyType,
+      executionStrategy.quorum,
+      proposalId
+    ]);
+  }
+};
+
+export const handleExecute: CheckpointWriter = async ({ tx, rawEvent, event, mysql }) => {
+  if (!rawEvent || !event) return;
+
+  console.log('Handle execute');
+
+  const space = validateAndParseAddress(rawEvent.from_address);
+  const proposalId = `${space}/${parseInt(event.proposal_id)}`;
+
+  const query = `UPDATE proposals SET executed = true, completed = true, execution_tx = ? WHERE id = ? LIMIT 1;`;
+  await mysql.queryAsync(query, [tx.transaction_hash, proposalId]);
 };
 
 export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mysql }) => {
@@ -354,4 +410,38 @@ async function handleProposalMetadata(metadataUri: string, mysql: AsyncMySqlPool
 
   const query = `INSERT IGNORE INTO proposalmetadataitems SET ?;`;
   await mysql.queryAsync(query, [metadataItem]);
+}
+
+async function handleExecutionStrategy(address: string, payload: string[]) {
+  try {
+    const executionContract = new Contract(ExecutionStrategyAbi, address, starkProvider);
+
+    const executionStrategyType = shortString.decodeShortString(
+      await executionContract.get_strategy_type()
+    );
+
+    let quorum = 0n;
+    if (executionStrategyType === 'SimpleQuorumVanilla') {
+      quorum = await executionContract.quorum();
+    } else if (executionStrategyType === 'EthRelayer') {
+      const [l1Destination] = payload;
+
+      const SimpleQuorumExecutionStrategyContract = new EthContract(
+        l1Destination,
+        SimpleQuorumExecutionStrategyAbi,
+        ethProvider
+      );
+
+      quorum = await SimpleQuorumExecutionStrategyContract.quorum();
+    }
+
+    return {
+      executionStrategyType,
+      quorum
+    };
+  } catch (e) {
+    console.log('failed to get execution strategy type', e);
+
+    return null;
+  }
 }
