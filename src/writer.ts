@@ -1,52 +1,21 @@
 import { formatUnits } from '@ethersproject/units';
-import { Contract as EthContract } from '@ethersproject/contracts';
-import { JsonRpcProvider } from '@ethersproject/providers';
-import { Contract, CallData, Provider, shortString, validateAndParseAddress } from 'starknet';
+import { CallData, validateAndParseAddress } from 'starknet';
 import { utils } from '@snapshot-labs/sx';
 import EncodersAbi from './abis/encoders.json';
-import ExecutionStrategyAbi from './abis/executionStrategy.json';
-import SimpleQuorumExecutionStrategyAbi from './abis/l1/SimpleQuorumExecutionStrategy.json';
-import { getJSON, getSpaceName } from './utils';
-import Config from './config.json';
-import type { AsyncMySqlPool, CheckpointWriter } from '@snapshot-labs/checkpoint';
+import { CheckpointWriter } from '@snapshot-labs/checkpoint';
+import { handleProposalMetadata, handleSpaceMetadata } from './ipfs';
+import {
+  dropIpfs,
+  findVariant,
+  getVoteValue,
+  handleExecutionStrategy,
+  handleStrategiesMetadata,
+  longStringToText
+} from './utils';
 
 const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
   '0x120c5b7866d8c89eed24c54f4f3abac9ddf39bdda4cd75d5fc0a0eea93644bd';
 const encodersAbi = new CallData(EncodersAbi);
-
-const ethProvider = new JsonRpcProvider('http://127.0.0.1:8545');
-
-const starkProvider = new Provider({
-  rpc: {
-    nodeUrl: Config.network_node_url
-  }
-});
-
-function dropIpfs(metadataUri: string) {
-  return metadataUri.replace('ipfs://', '');
-}
-
-function longStringToText(array: string[]): string {
-  return array.reduce((acc, slice) => acc + shortString.decodeShortString(slice), '');
-}
-
-function findVariant(value: { variant: Record<string, any> }) {
-  const result = Object.entries(value.variant).find(([, v]) => typeof v !== 'undefined');
-  if (!result) throw new Error('Invalid variant');
-
-  return {
-    key: result[0],
-    value: result[1]
-  };
-}
-
-function getVoteValue(label: string) {
-  if (label === 'Against') return 0;
-  if (label === 'For') return 1;
-  if (label === 'Abstain') return 2;
-
-  throw new Error('Invalid vote label');
-}
 
 export const handleSpaceDeployed: CheckpointWriter = async ({ blockNumber, event, instance }) => {
   console.log('Handle space deployed');
@@ -350,163 +319,3 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
     voter
   ]);
 };
-
-async function handleSpaceMetadata(space: string, metadataUri: string, mysql: AsyncMySqlPool) {
-  const metadataItem = {
-    id: dropIpfs(metadataUri),
-    name: getSpaceName(space),
-    about: '',
-    avatar: '',
-    cover: '',
-    external_url: '',
-    delegation_api_type: '',
-    delegation_api_url: '',
-    github: '',
-    twitter: '',
-    discord: '',
-    voting_power_symbol: '',
-    wallet: '',
-    executors: JSON.stringify([]),
-    executors_types: JSON.stringify([])
-  };
-
-  const metadata: any = metadataUri ? await getJSON(metadataUri) : {};
-
-  if (metadata.name) metadataItem.name = metadata.name;
-  if (metadata.description) metadataItem.about = metadata.description;
-  if (metadata.avatar) metadataItem.avatar = metadata.avatar;
-  if (metadata.external_url) metadataItem.external_url = metadata.external_url;
-
-  if (metadata.properties) {
-    if (metadata.properties.cover) metadataItem.cover = metadata.properties.cover;
-    if (
-      metadata.properties.delegation_api_type === 'governor-subgraph' &&
-      metadata.properties.delegation_api_url
-    ) {
-      metadataItem.delegation_api_type = metadata.properties.delegation_api_type;
-      metadataItem.delegation_api_url = metadata.properties.delegation_api_url;
-    }
-    if (metadata.properties.github) metadataItem.github = metadata.properties.github;
-    if (metadata.properties.twitter) metadataItem.twitter = metadata.properties.twitter;
-    if (metadata.properties.discord) metadataItem.discord = metadata.properties.discord;
-    if (metadata.properties.voting_power_symbol) {
-      metadataItem.voting_power_symbol = metadata.properties.voting_power_symbol;
-    }
-    if (metadata.properties.wallets && metadata.properties.wallets.length > 0) {
-      metadataItem.wallet = metadata.properties.wallets[0];
-    }
-    if (
-      metadata.properties.execution_strategies &&
-      metadata.properties.execution_strategies_types
-    ) {
-      metadataItem.executors = JSON.stringify(metadata.properties.execution_strategies);
-      metadataItem.executors_types = JSON.stringify(metadata.properties.execution_strategies_types);
-    }
-  }
-
-  const query = `INSERT IGNORE INTO spacemetadataitems SET ?;`;
-  await mysql.queryAsync(query, [metadataItem]);
-}
-
-async function handleProposalMetadata(metadataUri: string, mysql: AsyncMySqlPool) {
-  const metadataItem = {
-    id: dropIpfs(metadataUri),
-    title: '',
-    body: '',
-    discussion: '',
-    execution: ''
-  };
-
-  const metadata: any = await getJSON(metadataUri);
-  if (metadata.title) metadataItem.title = metadata.title;
-  if (metadata.body) metadataItem.body = metadata.body;
-  if (metadata.discussion) metadataItem.discussion = metadata.discussion;
-  if (metadata.execution) metadataItem.execution = JSON.stringify(metadata.execution);
-
-  const query = `INSERT IGNORE INTO proposalmetadataitems SET ?;`;
-  await mysql.queryAsync(query, [metadataItem]);
-}
-
-async function handleExecutionStrategy(address: string, payload: string[]) {
-  try {
-    const executionContract = new Contract(ExecutionStrategyAbi, address, starkProvider);
-
-    const executionStrategyType = shortString.decodeShortString(
-      await executionContract.get_strategy_type()
-    );
-
-    let quorum = 0n;
-    if (executionStrategyType === 'SimpleQuorumVanilla') {
-      quorum = await executionContract.quorum();
-    } else if (executionStrategyType === 'EthRelayer') {
-      const [l1Destination] = payload;
-
-      const SimpleQuorumExecutionStrategyContract = new EthContract(
-        l1Destination,
-        SimpleQuorumExecutionStrategyAbi,
-        ethProvider
-      );
-
-      quorum = await SimpleQuorumExecutionStrategyContract.quorum();
-    }
-
-    return {
-      executionStrategyType,
-      quorum
-    };
-  } catch (e) {
-    console.log('failed to get execution strategy type', e);
-
-    return null;
-  }
-}
-
-async function handleStrategiesMetadata(
-  spaceId: string,
-  metadataUris: string[],
-  mysql: AsyncMySqlPool
-) {
-  for (let i = 0; i < metadataUris.length; i++) {
-    const metadataUri = metadataUris[i];
-
-    const item = {
-      id: `${spaceId}/${i}`,
-      space: spaceId,
-      index: i,
-      data: null as string | null
-    };
-
-    if (metadataUri.startsWith('ipfs://')) {
-      item.data = dropIpfs(metadataUri);
-
-      await handleStrategiesParsedMetadata(metadataUri, mysql);
-    }
-
-    const query = `INSERT IGNORE INTO strategiesparsedmetadataitems SET ?;`;
-    await mysql.queryAsync(query, [item]);
-  }
-}
-
-async function handleStrategiesParsedMetadata(metadataUri: string, mysql: AsyncMySqlPool) {
-  const metadataItem = {
-    id: dropIpfs(metadataUri),
-    name: '',
-    description: '',
-    decimals: 0,
-    symbol: '',
-    token: null
-  };
-
-  const metadata: any = await getJSON(metadataUri);
-  if (metadata.name) metadataItem.name = metadata.name;
-  if (metadata.description) metadataItem.description = metadata.description;
-
-  if (metadata.properties) {
-    if (metadata.properties.decimals) metadataItem.decimals = metadata.properties.decimals;
-    if (metadata.properties.symbol) metadataItem.symbol = metadata.properties.symbol;
-    if (metadata.properties.token) metadataItem.token = metadata.properties.token;
-  }
-
-  const query = `INSERT IGNORE INTO strategiesparsedmetadatadataitems SET ?;`;
-  await mysql.queryAsync(query, [metadataItem]);
-}
