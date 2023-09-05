@@ -365,7 +365,9 @@ async function handleSpaceMetadata(space: string, metadataUri: string, mysql: As
     twitter: '',
     discord: '',
     voting_power_symbol: '',
-    wallet: ''
+    wallet: '',
+    executors: JSON.stringify([]),
+    executors_types: JSON.stringify([])
   };
 
   const metadata: any = metadataUri ? await getJSON(metadataUri) : {};
@@ -392,6 +394,13 @@ async function handleSpaceMetadata(space: string, metadataUri: string, mysql: As
     }
     if (metadata.properties.wallets && metadata.properties.wallets.length > 0) {
       metadataItem.wallet = metadata.properties.wallets[0];
+    }
+    if (
+      metadata.properties.execution_strategies &&
+      metadata.properties.execution_strategies_types
+    ) {
+      metadataItem.executors = JSON.stringify(metadata.properties.execution_strategies);
+      metadataItem.executors_types = JSON.stringify(metadata.properties.execution_strategies_types);
     }
   }
 

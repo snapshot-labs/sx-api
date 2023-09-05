@@ -39,6 +39,8 @@ type SpaceMetadataItem {
   discord: String
   voting_power_symbol: String
   wallet: String
+  executors: [String]
+  executors_types: [String]
 }
 
 type StrategiesParsedMetadataItem {
