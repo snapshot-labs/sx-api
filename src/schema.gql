@@ -12,6 +12,7 @@ type Space {
   strategies: [String]
   strategies_params: [String]
   strategies_metadata: [String]
+  strategies_parsed_metadata: [StrategiesParsedMetadataItem]! @derivedFrom(field: "space")
   authenticators: [String]
   validation_strategy: String!
   validation_strategy_params: String!
@@ -38,6 +39,22 @@ type SpaceMetadataItem {
   discord: String
   voting_power_symbol: String
   wallet: String
+}
+
+type StrategiesParsedMetadataItem {
+  id: String!
+  space: Space!
+  index: Int!
+  data: StrategiesParsedMetadataDataItem
+}
+
+type StrategiesParsedMetadataDataItem {
+  id: String!
+  name: String!
+  description: String!
+  decimals: Int!
+  symbol: String!
+  token: String
 }
 
 type Proposal {

@@ -8,10 +8,10 @@ import ExecutionStrategyAbi from './abis/executionStrategy.json';
 import SimpleQuorumExecutionStrategyAbi from './abis/l1/SimpleQuorumExecutionStrategy.json';
 import { getJSON, getSpaceName } from './utils';
 import Config from './config.json';
-import type { AsyncMySqlPool, CheckpointWriter, ParsedEvent } from '@snapshot-labs/checkpoint';
+import type { AsyncMySqlPool, CheckpointWriter } from '@snapshot-labs/checkpoint';
 
 const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
-  '0x4f00d2ef6b6c0e0de21fe1034176bf1f094fa2d7edd75348653cfef3440494a';
+  '0x120c5b7866d8c89eed24c54f4f3abac9ddf39bdda4cd75d5fc0a0eea93644bd';
 const encodersAbi = new CallData(EncodersAbi);
 
 const ethProvider = new JsonRpcProvider('http://127.0.0.1:8545');
@@ -120,6 +120,12 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, m
     item.metadata = dropIpfs(metadataUri);
   } catch (e) {
     console.log('failed to parse space metadata', e);
+  }
+
+  try {
+    await handleStrategiesMetadata(item.id, strategiesMetadataUris, mysql);
+  } catch (e) {
+    console.log('failed to handle strategies metadata', e);
   }
 
   const query = `INSERT IGNORE INTO spaces SET ?;`;
@@ -444,4 +450,54 @@ async function handleExecutionStrategy(address: string, payload: string[]) {
 
     return null;
   }
+}
+
+async function handleStrategiesMetadata(
+  spaceId: string,
+  metadataUris: string[],
+  mysql: AsyncMySqlPool
+) {
+  for (let i = 0; i < metadataUris.length; i++) {
+    const metadataUri = metadataUris[i];
+
+    const item = {
+      id: `${spaceId}/${i}`,
+      space: spaceId,
+      index: i,
+      data: null as string | null
+    };
+
+    if (metadataUri.startsWith('ipfs://')) {
+      item.data = dropIpfs(metadataUri);
+
+      await handleStrategiesParsedMetadata(metadataUri, mysql);
+    }
+
+    const query = `INSERT IGNORE INTO strategiesparsedmetadataitems SET ?;`;
+    await mysql.queryAsync(query, [item]);
+  }
+}
+
+async function handleStrategiesParsedMetadata(metadataUri: string, mysql: AsyncMySqlPool) {
+  const metadataItem = {
+    id: dropIpfs(metadataUri),
+    name: '',
+    description: '',
+    decimals: 0,
+    symbol: '',
+    token: null
+  };
+
+  const metadata: any = await getJSON(metadataUri);
+  if (metadata.name) metadataItem.name = metadata.name;
+  if (metadata.description) metadataItem.description = metadata.description;
+
+  if (metadata.properties) {
+    if (metadata.properties.decimals) metadataItem.decimals = metadata.properties.decimals;
+    if (metadata.properties.symbol) metadataItem.symbol = metadata.properties.symbol;
+    if (metadata.properties.token) metadataItem.token = metadata.properties.token;
+  }
+
+  const query = `INSERT IGNORE INTO strategiesparsedmetadatadataitems SET ?;`;
+  await mysql.queryAsync(query, [metadataItem]);
 }

@@ -2,7 +2,7 @@
   "network_node_url": "http://127.0.0.1:5050/rpc",
   "sources": [
     {
-      "contract": "0x2de452740896a0eb49b23aaeb5b188fc8e444ce9e17f6318127daf6127efefc",
+      "contract": "0x7962d6f8df00e4cea489fbab74c84e923485848127abf456467b5ba66f059d6",
       "start": 1,
       "abi": "SpaceFactory",
       "events": [
