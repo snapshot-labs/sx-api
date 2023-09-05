@@ -1,4 +1,3 @@
-import { formatUnits } from '@ethersproject/units';
 import { CallData, validateAndParseAddress } from 'starknet';
 import { utils } from '@snapshot-labs/sx';
 import EncodersAbi from './abis/encoders.json';
@@ -280,7 +279,7 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event, mys
   const proposal = parseInt(event.proposal_id);
   const voter = findVariant(event.voter).value;
   const choice = getVoteValue(findVariant(event.choice).key);
-  const vp = parseFloat(formatUnits(BigInt(event.voting_power), 18));
+  const vp = BigInt(event.voting_power);
 
   const created = block?.timestamp ?? Date.now();
 
