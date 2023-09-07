@@ -13,7 +13,7 @@ import {
 } from './utils';
 
 const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
-  '0x120c5b7866d8c89eed24c54f4f3abac9ddf39bdda4cd75d5fc0a0eea93644bd';
+  '0x78a2ddc7e001ce3f5f588ce023f7a148890d5ef6e99da1b5e3314b95a5de773';
 const encodersAbi = new CallData(EncodersAbi);
 
 export const handleSpaceDeployed: CheckpointWriter = async ({ blockNumber, event, instance }) => {

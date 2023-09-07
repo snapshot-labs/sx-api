@@ -1,9 +1,9 @@
 {
-  "network_node_url": "http://127.0.0.1:5050/rpc",
+  "network_node_url": "https://starknet-goerli.infura.io/v3/46a5dd9727bf48d4a132672d3f376146",
   "sources": [
     {
-      "contract": "0x7962d6f8df00e4cea489fbab74c84e923485848127abf456467b5ba66f059d6",
-      "start": 1,
+      "contract": "0x3b04349f509c875827a8f7532b63103cd02d07539f2075783f43acf282114ab",
+      "start": 858490,
       "abi": "SpaceFactory",
       "events": [
         {
