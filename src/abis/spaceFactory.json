@@ -15,6 +15,20 @@
     ]
   },
   {
+    "type": "enum",
+    "name": "core::result::Result::<core::starknet::contract_address::ContractAddress, core::array::Array::<core::felt252>>",
+    "variants": [
+      {
+        "name": "Ok",
+        "type": "core::starknet::contract_address::ContractAddress"
+      },
+      {
+        "name": "Err",
+        "type": "core::array::Array::<core::felt252>"
+      }
+    ]
+  },
+  {
     "type": "interface",
     "name": "sx::factory::factory::IFactory",
     "items": [
@@ -37,7 +51,7 @@
         ],
         "outputs": [
           {
-            "type": "core::starknet::contract_address::ContractAddress"
+            "type": "core::result::Result::<core::starknet::contract_address::ContractAddress, core::array::Array::<core::felt252>>"
           }
         ],
         "state_mutability": "external"
@@ -46,7 +60,7 @@
   },
   {
     "type": "event",
-    "name": "sx::factory::factory::Factory::SpaceDeployed",
+    "name": "sx::factory::factory::Factory::NewContractDeployed",
     "kind": "struct",
     "members": [
       {
@@ -55,7 +69,7 @@
         "kind": "data"
       },
       {
-        "name": "space_address",
+        "name": "contract_address",
         "type": "core::starknet::contract_address::ContractAddress",
         "kind": "data"
       }
@@ -67,8 +81,8 @@
     "kind": "enum",
     "variants": [
       {
-        "name": "SpaceDeployed",
-        "type": "sx::factory::factory::Factory::SpaceDeployed",
+        "name": "NewContractDeployed",
+        "type": "sx::factory::factory::Factory::NewContractDeployed",
         "kind": "nested"
       }
     ]

@@ -13,7 +13,7 @@ import {
 } from './utils';
 
 const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
-  '0x78a2ddc7e001ce3f5f588ce023f7a148890d5ef6e99da1b5e3314b95a5de773';
+  '0x38f034f17941669555fca61c43c67a517263aaaab833b26a1ab877a21c0bb6d';
 const encodersAbi = new CallData(EncodersAbi);
 
 export const handleSpaceDeployed: CheckpointWriter = async ({ blockNumber, event, instance }) => {
@@ -22,7 +22,7 @@ export const handleSpaceDeployed: CheckpointWriter = async ({ blockNumber, event
   if (!event) return;
 
   await instance.executeTemplate('Space', {
-    contract: event.space_address,
+    contract: event.contract_address,
     start: blockNumber
   });
 };
@@ -34,7 +34,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, m
 
   const strategies = event.voting_strategies.map(strategy => strategy.address);
   const strategiesParams = event.voting_strategies.map(strategy => strategy.params.join(',')); // different format than sx-evm
-  const strategiesMetadataUris = event.voting_strategy_metadata_URIs.map(array =>
+  const strategiesMetadataUris = event.voting_strategy_metadata_uris.map(array =>
     longStringToText(array)
   );
 
@@ -82,7 +82,7 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event, m
     }
   }
   try {
-    const metadataUri = longStringToText(event.metadata_URI || []).replaceAll('\x00', '');
+    const metadataUri = longStringToText(event.metadata_uri || []).replaceAll('\x00', '');
     await handleSpaceMetadata(item.id, metadataUri, mysql);
 
     item.metadata = dropIpfs(metadataUri);
@@ -108,7 +108,7 @@ export const handleMetadataUriUpdated: CheckpointWriter = async ({ rawEvent, eve
   const space = validateAndParseAddress(rawEvent.from_address);
 
   try {
-    const metadataUri = longStringToText(event.metadata_URI).replaceAll('\x00', '');
+    const metadataUri = longStringToText(event.metadata_uri).replaceAll('\x00', '');
     await handleSpaceMetadata(space, metadataUri, mysql);
 
     const query = `UPDATE spaces SET metadata = ? WHERE id = ? LIMIT 1;`;
@@ -175,7 +175,7 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
   }
 
   try {
-    const metadataUri = longStringToText(event.metadata_URI);
+    const metadataUri = longStringToText(event.metadata_uri);
     await handleProposalMetadata(metadataUri, mysql);
 
     item.metadata = dropIpfs(metadataUri);
@@ -229,7 +229,7 @@ export const handleUpdate: CheckpointWriter = async ({ block, rawEvent, event, m
 
   const space = validateAndParseAddress(rawEvent.from_address);
   const proposalId = `${space}/${parseInt(event.proposal_id)}`;
-  const metadataUri = longStringToText(event.metadata_URI);
+  const metadataUri = longStringToText(event.metadata_uri);
 
   try {
     await handleProposalMetadata(metadataUri, mysql);
