@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "scripts": {
+    "codegen": "checkpoint generate",
     "lint": "eslint src/ test/ --ext .ts --fix",
     "build": "tsc -p tsconfig.build.json",
     "dev": "nodemon src/index.ts",
