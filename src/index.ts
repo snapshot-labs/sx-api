@@ -31,7 +31,10 @@ const checkpoint = new Checkpoint(config, writer, schema, {
   }
 });
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function run() {
+  await sleep(20_000);
   await checkpoint.reset();
   await checkpoint.resetMetadata();
 
