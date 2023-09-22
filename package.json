@@ -5,6 +5,7 @@
   "scripts": {
     "codegen": "checkpoint generate",
     "lint": "eslint src/ test/ --ext .ts --fix",
+    "prebuild": "yarn codegen",
     "build": "tsc -p tsconfig.build.json",
     "dev": "nodemon src/index.ts",
     "start": "node dist/src/index.js",
