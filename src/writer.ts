@@ -348,6 +348,7 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event }) =
   vote.choice = choice;
   vote.vp = vp;
   vote.created = created;
+  await vote.save();
 
   const existingUser = await User.loadEntity(voter);
   if (existingUser) {
