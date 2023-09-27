@@ -1,6 +1,7 @@
 scalar Id
 scalar Text
 scalar BigInt
+scalar BigDecimalVP
 
 type Space {
   id: String!
@@ -79,10 +80,10 @@ type Proposal {
   timelock_delay: Int
   strategies: [String]!
   strategies_params: [String]!
-  scores_1: BigInt!
-  scores_2: BigInt!
-  scores_3: BigInt!
-  scores_total: BigInt!
+  scores_1: BigDecimalVP!
+  scores_2: BigDecimalVP!
+  scores_3: BigDecimalVP!
+  scores_total: BigDecimalVP!
   quorum: BigInt!
   created: Int!
   edited: Int
@@ -110,7 +111,7 @@ type Vote {
   space: Space!
   proposal: Int!
   choice: Int!
-  vp: BigInt!
+  vp: BigDecimalVP!
   created: Int!
 }
 

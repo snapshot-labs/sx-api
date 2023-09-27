@@ -206,10 +206,10 @@ export const handlePropose: CheckpointWriter = async ({ block, tx, rawEvent, eve
   proposal.execution_time = 0;
   proposal.execution_strategy = validateAndParseAddress(event.proposal.execution_strategy);
   proposal.execution_strategy_type = 'none';
-  proposal.scores_1 = 0n;
-  proposal.scores_2 = 0n;
-  proposal.scores_3 = 0n;
-  proposal.scores_total = 0n;
+  proposal.scores_1 = '0';
+  proposal.scores_2 = '0';
+  proposal.scores_3 = '0';
+  proposal.scores_total = '0';
   proposal.quorum = 0n;
   proposal.strategies = space.strategies;
   proposal.strategies_params = space.strategies_params;
@@ -346,7 +346,7 @@ export const handleVote: CheckpointWriter = async ({ block, rawEvent, event }) =
   vote.proposal = proposalId;
   vote.voter = voter;
   vote.choice = choice;
-  vote.vp = vp;
+  vote.vp = vp.toString();
   vote.created = created;
   await vote.save();
 
