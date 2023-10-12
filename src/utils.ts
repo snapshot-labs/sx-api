@@ -128,6 +128,7 @@ export async function handleExecutionStrategy(address: string, payload: string[]
 export async function handleStrategiesMetadata(
   spaceId: string,
   metadataUris: string[],
+  startingIndex: number,
   type:
     | typeof StrategiesParsedMetadataItem
     | typeof VotingPowerValidationStrategiesParsedMetadataItem = StrategiesParsedMetadataItem
@@ -135,15 +136,15 @@ export async function handleStrategiesMetadata(
   for (let i = 0; i < metadataUris.length; i++) {
     const metadataUri = metadataUris[i];
 
-    // this needs to include space as multiple spaces can reference identical metadata (same CID)
-    const uniqueId = `${spaceId}/${dropIpfs(metadataUri)}`;
+    const index = startingIndex + i;
+    const uniqueId = `${spaceId}/${index}/${dropIpfs(metadataUri)}`;
 
     const exists = await type.loadEntity(uniqueId);
     if (exists) continue;
 
     const strategiesParsedMetadataItem = new type(uniqueId);
     strategiesParsedMetadataItem.space = spaceId;
-    strategiesParsedMetadataItem.index = i;
+    strategiesParsedMetadataItem.index = index;
 
     if (metadataUri.startsWith('ipfs://')) {
       strategiesParsedMetadataItem.data = dropIpfs(metadataUri);
@@ -164,6 +165,7 @@ export async function handleVotingPowerValidationMetadata(spaceId: string, metad
   await handleStrategiesMetadata(
     spaceId,
     metadata.strategies_metadata,
+    0,
     VotingPowerValidationStrategiesParsedMetadataItem
   );
 }
