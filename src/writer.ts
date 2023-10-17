@@ -1,6 +1,4 @@
-import { CallData, validateAndParseAddress } from 'starknet';
-import { utils } from '@snapshot-labs/sx';
-import EncodersAbi from './abis/encoders.json';
+import { validateAndParseAddress } from 'starknet';
 import { CheckpointWriter } from '@snapshot-labs/checkpoint';
 import { Space, Vote, User, Proposal } from '../.checkpoint/models';
 import { handleProposalMetadata, handleSpaceMetadata } from './ipfs';
@@ -11,13 +9,9 @@ import {
   getVoteValue,
   handleExecutionStrategy,
   handleStrategiesMetadata,
-  handleVotingPowerValidationMetadata,
-  longStringToText
+  longStringToText,
+  updateProposaValidationStrategy
 } from './utils';
-
-const PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY =
-  '0x38f034f17941669555fca61c43c67a517263aaaab833b26a1ab877a21c0bb6d';
-const encodersAbi = new CallData(EncodersAbi);
 
 export const handleSpaceDeployed: CheckpointWriter = async ({ blockNumber, event, instance }) => {
   console.log('Handle space deployed');
@@ -54,46 +48,18 @@ export const handleSpaceCreated: CheckpointWriter = async ({ block, tx, event })
   space.strategies_params = strategiesParams;
   space.strategies_metadata = strategiesMetadataUris;
   space.authenticators = event.authenticators;
-  space.validation_strategy = event.proposal_validation_strategy.address;
-  space.validation_strategy_params = event.proposal_validation_strategy.params.join(',');
-  space.voting_power_validation_strategy_strategies = [];
-  space.voting_power_validation_strategy_strategies_params = [];
-  space.voting_power_validation_strategy_metadata = longStringToText(
-    event.proposal_validation_strategy_metadata_uri
-  );
   space.proposal_count = 0;
   space.vote_count = 0;
   space.created = block?.timestamp ?? getCurrentTimestamp();
   space.tx = tx.transaction_hash;
 
-  if (
-    utils.encoding.hexPadLeft(event.proposal_validation_strategy.address) ===
-    utils.encoding.hexPadLeft(PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY)
-  ) {
-    const parsed = encodersAbi.parse(
-      'proposition_power_params',
-      event.proposal_validation_strategy.params
-    ) as Record<string, any>;
+  await updateProposaValidationStrategy(
+    space,
+    event.proposal_validation_strategy.address,
+    event.proposal_validation_strategy.params,
+    event.proposal_validation_strategy_metadata_uri
+  );
 
-    if (Object.keys(parsed).length !== 0) {
-      space.proposal_threshold = parsed.proposal_threshold;
-      space.voting_power_validation_strategy_strategies = parsed.allowed_strategies.map(
-        strategy => `0x${strategy.address.toString(16)}`
-      );
-      space.voting_power_validation_strategy_strategies_params = parsed.allowed_strategies.map(
-        strategy => strategy.params.map(param => `0x${param.toString(16)}`).join(',')
-      );
-    }
-
-    try {
-      await handleVotingPowerValidationMetadata(
-        space.id,
-        space.voting_power_validation_strategy_metadata
-      );
-    } catch (e) {
-      console.log('failed to handle voting power strategies metadata', e);
-    }
-  }
   try {
     const metadataUri = longStringToText(event.metadata_uri || []).replaceAll('\x00', '');
     await handleSpaceMetadata(space.id, metadataUri);
@@ -300,42 +266,12 @@ export const handleProposalValidationStrategyUpdated: CheckpointWriter = async (
   const space = await Space.loadEntity(spaceId);
   if (!space) return;
 
-  space.validation_strategy = event.proposal_validation_strategy.address;
-  space.validation_strategy_params = event.proposal_validation_strategy.params.join(',');
-  space.voting_power_validation_strategy_strategies = [];
-  space.voting_power_validation_strategy_strategies_params = [];
-  space.voting_power_validation_strategy_metadata = longStringToText(
+  await updateProposaValidationStrategy(
+    space,
+    event.proposal_validation_strategy.address,
+    event.proposal_validation_strategy.params,
     event.proposal_validation_strategy_metadata_uri
   );
-
-  if (
-    utils.encoding.hexPadLeft(event.proposal_validation_strategy.address) ===
-    utils.encoding.hexPadLeft(PROPOSITION_POWER_PROPOSAL_VALIDATION_STRATEGY)
-  ) {
-    const parsed = encodersAbi.parse(
-      'proposition_power_params',
-      event.proposal_validation_strategy.params
-    ) as Record<string, any>;
-
-    if (Object.keys(parsed).length !== 0) {
-      space.proposal_threshold = parsed.proposal_threshold;
-      space.voting_power_validation_strategy_strategies = parsed.allowed_strategies.map(
-        strategy => `0x${strategy.address.toString(16)}`
-      );
-      space.voting_power_validation_strategy_strategies_params = parsed.allowed_strategies.map(
-        strategy => strategy.params.map(param => `0x${param.toString(16)}`).join(',')
-      );
-    }
-
-    try {
-      await handleVotingPowerValidationMetadata(
-        space.id,
-        space.voting_power_validation_strategy_metadata
-      );
-    } catch (e) {
-      console.log('failed to handle voting power strategies metadata', e);
-    }
-  }
 
   await space.save();
 };
