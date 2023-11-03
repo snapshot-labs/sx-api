@@ -35,7 +35,6 @@ const checkpoint = new Checkpoint(config, writer, schema, {
 
 async function run() {
   await checkpoint.reset();
-  await checkpoint.resetMetadata();
 
   checkpoint.start();
 
