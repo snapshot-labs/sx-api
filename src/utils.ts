@@ -142,8 +142,6 @@ export async function updateProposaValidationStrategy(
   space.voting_power_validation_strategy_strategies_params = [];
   space.voting_power_validation_strategy_metadata = longStringToText(metadataUri);
 
-  console.log('validationStrategyAddress', validationStrategyAddress);
-
   if (
     utils.encoding.hexPadLeft(validationStrategyAddress) ===
     utils.encoding.hexPadLeft(networkProperties.factoryAddress)
