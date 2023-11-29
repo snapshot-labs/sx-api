@@ -14,7 +14,7 @@ import {
 import EncodersAbi from './abis/encoders.json';
 import ExecutionStrategyAbi from './abis/executionStrategy.json';
 import SimpleQuorumExecutionStrategyAbi from './abis/l1/SimpleQuorumExecutionStrategy.json';
-import config, { networkProperties } from './config';
+import { networkNodeUrl, networkProperties } from './overrrides';
 import { handleStrategiesParsedMetadata } from './ipfs';
 
 const ethProvider = new JsonRpcProvider(
@@ -22,7 +22,7 @@ const ethProvider = new JsonRpcProvider(
 );
 const starkProvider = new Provider({
   rpc: {
-    nodeUrl: config.network_node_url
+    nodeUrl: networkNodeUrl
   }
 });
 
@@ -144,7 +144,7 @@ export async function updateProposaValidationStrategy(
 
   if (
     utils.encoding.hexPadLeft(validationStrategyAddress) ===
-    utils.encoding.hexPadLeft(networkProperties.factoryAddress)
+    utils.encoding.hexPadLeft(networkProperties.propositionPowerValidationStrategyAddress)
   ) {
     const parsed = encodersAbi.parse(
       'proposition_power_params',

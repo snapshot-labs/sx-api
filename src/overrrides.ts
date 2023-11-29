@@ -1,6 +1,4 @@
-import baseConfig from './config.json';
-
-const networkNodeUrl =
+export const networkNodeUrl =
   process.env.NETWORK_NODE_URL ||
   'https://starknet-goerli.infura.io/v3/46a5dd9727bf48d4a132672d3f376146';
 
@@ -19,15 +17,3 @@ const goerliConfig = {
 };
 
 export const networkProperties = process.env.NETWORK === 'SN_MAIN' ? mainnetConfig : goerliConfig;
-
-export default {
-  ...baseConfig,
-  network_node_url: networkNodeUrl,
-  sources: [
-    {
-      ...baseConfig.sources[0],
-      contract: networkProperties.factoryAddress,
-      start: networkProperties.startBlock
-    }
-  ]
-};

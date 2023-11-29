@@ -5,7 +5,7 @@ import Checkpoint, { createGetLoader, LogLevel } from '@snapshot-labs/checkpoint
 import { ApolloServer } from '@apollo/server';
 import { startStandaloneServer } from '@apollo/server/standalone';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
-import config from './config';
+import config from './currentConfig';
 import spaceFactoryAbi from './abis/spaceFactory.json';
 import spaceAbi from './abis/space.json';
 import * as writer from './writer';
