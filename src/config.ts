@@ -1,3 +1,5 @@
+import baseConfig from './config.json';
+
 const networkNodeUrl =
   process.env.NETWORK_NODE_URL ||
   'https://starknet-goerli.infura.io/v3/46a5dd9727bf48d4a132672d3f376146';
@@ -19,96 +21,13 @@ const goerliConfig = {
 export const networkProperties = process.env.NETWORK === 'SN_MAIN' ? mainnetConfig : goerliConfig;
 
 export default {
+  ...baseConfig,
   network_node_url: networkNodeUrl,
-  optimistic_indexing: true,
-  decimal_types: {
-    BigDecimalVP: {
-      p: 60,
-      d: 0
-    }
-  },
   sources: [
     {
+      ...baseConfig.sources[0],
       contract: networkProperties.factoryAddress,
-      start: networkProperties.startBlock,
-      abi: 'SpaceFactory',
-      events: [
-        {
-          name: 'NewContractDeployed',
-          fn: 'handleSpaceDeployed'
-        }
-      ]
+      start: networkProperties.startBlock
     }
-  ],
-  templates: {
-    Space: {
-      abi: 'Space',
-      events: [
-        {
-          name: 'SpaceCreated',
-          fn: 'handleSpaceCreated'
-        },
-        {
-          name: 'ProposalCreated',
-          fn: 'handlePropose'
-        },
-        {
-          name: 'ProposalCancelled',
-          fn: 'handleCancel'
-        },
-        {
-          name: 'ProposalUpdated',
-          fn: 'handleUpdate'
-        },
-        {
-          name: 'ProposalExecuted',
-          fn: 'handleExecute'
-        },
-        {
-          name: 'VoteCast',
-          fn: 'handleVote'
-        },
-        {
-          name: 'MetadataUriUpdated',
-          fn: 'handleMetadataUriUpdated'
-        },
-        {
-          name: 'MinVotingDurationUpdated',
-          fn: 'handleMinVotingDurationUpdated'
-        },
-        {
-          name: 'MaxVotingDurationUpdated',
-          fn: 'handleMaxVotingDurationUpdated'
-        },
-        {
-          name: 'VotingDelayUpdated',
-          fn: 'handleVotingDelayUpdated'
-        },
-        {
-          name: 'OwnershipTransferred',
-          fn: 'handleOwnershipTransferred'
-        },
-        {
-          name: 'AuthenticatorsAdded',
-          fn: 'handleAuthenticatorsAdded'
-        },
-        {
-          name: 'AuthenticatorsRemoved',
-          fn: 'handleAuthenticatorsRemoved'
-        },
-        {
-          name: 'VotingStrategiesAdded',
-          fn: 'handleVotingStrategiesAdded'
-        },
-        {
-          name: 'VotingStrategiesRemoved',
-          fn: 'handleVotingStrategiesRemoved'
-        },
-        {
-          name: 'ProposalValidationStrategyUpdated',
-          fn: 'handleProposalValidationStrategyUpdated'
-        }
-      ]
-    }
-  }
+  ]
 };
